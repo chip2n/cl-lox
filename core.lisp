@@ -121,7 +121,8 @@
           (#\> (push-token (if (match #\=) :greater-equal :greater)))
           (#\/ (if (match #\/)
                    ;; A comment goes until the end of the line
-                   (advance-while (lambda (c) (not (char= c #\Newline))))
+                   (advance-while (lambda (c) (and (not (char= c #\Newline))
+                                              (not (end-p)))))
                    (push-token :slash)))
           (#\Newline (incf line))
           (#\Space)
