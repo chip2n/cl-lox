@@ -31,16 +31,16 @@
     (loop :for token :in tokens :do
       (format t "Token: ~a~%" token))))
 
-(defvar *keywords*
-  (make-keywords-table
-   :and :class :else :false :fun :for :if :nil :or :print :return :super :this :true :var :while))
-
 (defun make-keywords-table (&rest keywords)
   (let ((m (make-hash-table :test 'equal)))
     (loop :for keyword :in keywords
           :for key := (str:downcase (symbol-name keyword)) :do
             (setf (gethash key m) keyword))
     m))
+
+(defvar *keywords*
+  (make-keywords-table
+   :and :class :else :false :fun :for :if :nil :or :print :return :super :this :true :var :while))
 
 (deftype token-type ()
   `(member
