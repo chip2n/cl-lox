@@ -1,6 +1,6 @@
 (in-package #:lox)
 
-(declaim (optimize safety))
+(declaim (optimize (safety 3) (debug 3)))
 
 (defun main ()
   (let ((args (uiop:command-line-arguments)))
