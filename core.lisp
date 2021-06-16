@@ -79,7 +79,12 @@
         (line 1)
         (tokens nil))
     (labels ((current-str () (str:substring start current source))
-             (advance-while (pred) (loop :while (funcall pred (peek)) :do (incf current)))
+             (advance-while (pred)
+               (loop :for next := (peek)
+                     :while (and (funcall pred next) (not (end-p)))
+                     :do (when (char= next #\Newline)
+                           (incf line))
+                         (incf current)))
              (push-token (type &key lexeme literal)
                (let ((lexeme (or lexeme (current-str))))
                  (push (make-instance 'token :type type :lexeme lexeme :literal literal :line line)
@@ -119,11 +124,30 @@
           (#\= (push-token (if (match #\=) :equal-equal :equal)))
           (#\< (push-token (if (match #\=) :less-equal :less)))
           (#\> (push-token (if (match #\=) :greater-equal :greater)))
-          (#\/ (if (match #\/)
-                   ;; A comment goes until the end of the line
-                   (advance-while (lambda (c) (and (not (char= c #\Newline))
-                                              (not (end-p)))))
-                   (push-token :slash)))
+          (#\/
+           (cond
+             ((match #\/)
+              (advance-while (lambda (c) (and (not (char= c #\Newline))))))
+             ((match #\*)
+              (let ((depth 1))
+                (labels ((at-block-start? (next)
+                           (and (char= next #\/) (char= (peek-next) #\*)))
+                         (at-block-end? (next)
+                           (and (char= next #\*) (char= (peek-next) #\/))))
+                  (loop :while (> depth 0)
+                        :do (advance-while (lambda (c) (not (or (at-block-start? c) (at-block-end? c)))))
+
+                            (when (end-p)
+                              (report-error line "Unterminated block comment."))
+
+                            (if (char= (peek) #\*)
+                                (decf depth)
+                                (incf depth))
+
+                            (incf current 2)))))
+             (t
+              ;; A comment goes until the end of the line
+              (push-token :slash))))
           (#\Newline (incf line))
           (#\Space)
           (#\Return)
@@ -131,11 +155,7 @@
 
           ;; Strings (supports multiline)
           (#\"
-           (loop :while (and (not (char= (peek) #\")) (not (end-p)))
-                 :do
-                    (when (char= (peek) #\Newline)
-                      (incf line))
-                    (incf current))
+           (advance-while (lambda (c) (and (not (char= c #\")))))
            (when (end-p)
              (report-error line "Unterminated string."))
 
