@@ -6,4 +6,5 @@
   :serial t
   :depends-on (#:str #:parse-number)
   :components ((:file "package")
+               (:file "scanner")
                (:file "core")))
