@@ -32,10 +32,10 @@
     :eof))
 
 (defclass token ()
-  ((type :type token-type :initarg :type)
-   (lexeme :type string :initarg :lexeme)
-   (literal :initarg :literal)
-   (line :type integer :initarg :line)))
+  ((type :type token-type :initarg :type :accessor token-type)
+   (lexeme :type string :initarg :lexeme :accessor token-lexeme)
+   (literal :initarg :literal :accessor token-literal)
+   (line :type integer :initarg :line :accessor token-line)))
 
 (defmethod print-object ((obj token) out)
   (with-slots (type lexeme literal) obj

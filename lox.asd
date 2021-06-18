@@ -4,7 +4,8 @@
   :license  "Specify license here"
   :version "0.0.1"
   :serial t
-  :depends-on (#:str #:parse-number)
+  :depends-on (#:str #:parse-number #:parachute)
   :components ((:file "package")
                (:file "scanner")
+               (:file "parser")
                (:file "core")))
