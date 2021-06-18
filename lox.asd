@@ -8,4 +8,5 @@
   :components ((:file "package")
                (:file "scanner")
                (:file "parser")
+               (:file "pprint")
                (:file "core")))
