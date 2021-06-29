@@ -30,3 +30,104 @@
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
+
+;;; * Parser
+
+(define-condition parse-errer (error) ())
+
+(defun parse (tokens)
+  (let ((tokens (make-array (length tokens) :initial-contents tokens))
+        (current 0))
+    (labels ((match (&rest types)
+               (loop :for type :in types
+                     :do (when (check type)
+                           (advance)
+                           (return t))))
+             (check (type)
+               (unless (at-end?)
+                 (eq (token-type (peek)) type)))
+             (advance ()
+               (unless (at-end?)
+                 (incf current))
+               (previous))
+             (at-end? ()
+               (eq (token-type (peek)) :eof))
+             (peek ()
+               (aref tokens current))
+             (previous ()
+               (aref tokens (- current 1)))
+             (throw-error (token msg)
+               (report-error token msg)
+               (error 'parse-error))
+             (consume (type msg)
+               (if (check type)
+                   (advance)
+                   (throw-error (peek) msg)))
+             (synchronize ()
+               (advance)
+               ;; Discard tokens until we think we've found a statement boundary
+               ;; TODO Do this check in a better way :D
+               (loop :while (not (at-end?))
+                     :do (unless (or (eq (token-type (previous)) :semicolon)
+                                     (eq (token-type (peek)) :class)
+                                     (eq (token-type (peek)) :fun)
+                                     (eq (token-type (peek)) :var)
+                                     (eq (token-type (peek)) :for)
+                                     (eq (token-type (peek)) :if)
+                                     (eq (token-type (peek)) :while)
+                                     (eq (token-type (peek)) :print)
+                                     (eq (token-type (peek)) :return))
+                           (advance)))))
+      ;; TODO handle parse-error condition
+      (with-grammar
+        (expression)))))
+
+;; TODO make a defgrammar macro
+
+(defmacro with-grammar (&body body)
+  (let ((rules '(expression equality comparison term factor unary primary)))
+    `(labels ,(mapcar (lambda (rule) `(,rule () ,(funcall rule))) rules)
+       ,@body)))
+
+(defun expand-parse-binary (rule &rest types)
+  `(let ((expr (,rule)))
+     (loop :while (match ,@types)
+           :do (let ((op (previous))
+                     (right (,rule)))
+                 (setf expr (binary-expr :left expr :operator op :right right))))
+     expr))
+
+(defun expression ()
+  `(equality))
+
+(defun equality ()
+  (expand-parse-binary 'comparison :bang-equal :equal-equal))
+
+(defun comparison ()
+  (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
+
+(defun term ()
+  (expand-parse-binary 'factor :minus :plus))
+
+(defun factor ()
+  (expand-parse-binary 'unary :slash :star))
+
+(defun unary ()
+  `(if (match :bang :minus)
+       (let ((op (previous))
+             (right (unary)))
+         (unary-expr :operator op :right right))
+       (primary)))
+
+(defun primary ()
+  `(cond
+     ((match :false) (literal-expr :value 'false))
+     ((match :true) (literal-expr :value t))
+     ((match :nil) (literal-expr :value nil))
+     ((match :number :string) (literal-expr :value (token-literal (previous))))
+     ((match :left-paren)
+      (let ((expr (expression)))
+        (consume :right-paren "Expect ')' after expression.")
+        (grouping-expr :expression expr)))
+     (t
+      (throw-error (peek) "Expect expression."))))

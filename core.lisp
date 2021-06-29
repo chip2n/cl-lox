@@ -27,14 +27,22 @@
       (setf *error* nil))))
 
 (defun run (source)
-  (let ((tokens (scan-tokens source)))
-    (loop :for token :in tokens :do
-      (format t "Token: ~a~%" token))))
+  (let* ((tokens (scan-tokens source))
+         (expr (parse tokens)))
+    (unless *error*
+      (format t "~a~%" (pretty-print expr)))))
 
 (defvar *error* nil)
 
-(defun report-error (line msg)
+(defgeneric report-error (location msg))
+
+(defmethod report-error ((line string) msg)
   (report line "" msg))
+
+(defmethod report-error ((token token) msg)
+  (if (eq (token-type token) :eof)
+      (report (token-line token) " at end" msg)
+      (report (token-line token) (str:concat " at '" (token-lexeme token) "'") msg)))
 
 (defun report (line where msg)
   (format t "[line ~a] Error~a: ~a~%" line where msg)
