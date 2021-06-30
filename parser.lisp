@@ -33,6 +33,11 @@
 
 ;;; * Parser
 
+(defmacro with-grammar (&body body)
+  (let ((rules '(expression equality comparison term factor unary primary)))
+    `(labels ,(mapcar (lambda (rule) `(,rule () ,(funcall rule))) rules)
+       ,@body)))
+
 (define-condition parse-errer (error) ())
 
 (defun parse (tokens)
@@ -83,11 +88,6 @@
         (expression)))))
 
 ;; TODO make a defgrammar macro
-
-(defmacro with-grammar (&body body)
-  (let ((rules '(expression equality comparison term factor unary primary)))
-    `(labels ,(mapcar (lambda (rule) `(,rule () ,(funcall rule))) rules)
-       ,@body)))
 
 (defun expand-parse-binary (rule &rest types)
   `(let ((expr (,rule)))
