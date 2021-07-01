@@ -40,6 +40,80 @@
 
 (define-condition parse-errer (error) ())
 
+;; TODO make a defgrammar macro
+
+(eval-when
+    (:compile-toplevel
+     :load-toplevel
+     :execute)
+  (defun expand-parse-binary (rule &rest types)
+    `(let ((expr (,rule)))
+       (loop :while (match ,@types)
+             :do (let ((op (previous))
+                       (right (,rule)))
+                   (setf expr (binary-expr :left expr :operator op :right right))))
+       expr))
+
+  (defun expression ()
+    `(equality))
+
+  (defun equality ()
+    (expand-parse-binary 'comparison :bang-equal :equal-equal))
+
+  (defun comparison ()
+    (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
+
+  (defun term ()
+    (expand-parse-binary 'factor :minus :plus))
+
+  (defun factor ()
+    (expand-parse-binary 'unary :slash :star))
+
+  (defun unary ()
+    `(if (match :bang :minus)
+         (let ((op (previous))
+               (right (unary)))
+           (unary-expr :operator op :right right))
+         (primary)))
+
+  (defun primary ()
+    `(cond
+       ((match :false) (literal-expr :value 'false))
+       ((match :true) (literal-expr :value t))
+       ((match :nil) (literal-expr :value nil))
+       ((match :number :string) (literal-expr :value (token-literal (previous))))
+       ((match :left-paren)
+        (let ((expr (expression)))
+          (consume :right-paren "Expect ')' after expression.")
+          (grouping-expr :expression expr)))
+       (t
+        (throw-error (peek) "Expect expression.")))))
+
+;; expression     → equality ;
+;; equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+;; comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+;; term           → factor ( ( "-" | "+" ) factor )* ;
+;; factor         → unary ( ( "/" | "*" ) unary )* ;
+;; unary          → ( "!" | "-" ) unary
+;;                | primary ;
+;; primary        → NUMBER | STRING | "true" | "false" | "nil"
+;;                | "(" expression ")" ;
+
+;; In C, a block is a statement form that allows you to pack a series of statements
+;; where a single one is expected. The comma operator is an analogous syntax for
+;; expressions. A comma-separated series of expressions can be given where a single
+;; expression is expected (except inside a function call’s argument list). At
+;; runtime, the comma operator evaluates the left operand and discards the
+;; result. Then it evaluates and returns the right operand.
+
+;; Add support for comma expressions. Give them the same precedence and
+;; associativity as in C. Write the grammar, and then implement the necessary
+;; parsing code.
+
+
+;; Below unary?
+;; comma         → expression ( "," expression )* ;
+
 (defun parse (tokens)
   (let ((tokens (make-array (length tokens) :initial-contents tokens))
         (current 0))
@@ -86,48 +160,3 @@
       ;; TODO handle parse-error condition
       (with-grammar
         (expression)))))
-
-;; TODO make a defgrammar macro
-
-(defun expand-parse-binary (rule &rest types)
-  `(let ((expr (,rule)))
-     (loop :while (match ,@types)
-           :do (let ((op (previous))
-                     (right (,rule)))
-                 (setf expr (binary-expr :left expr :operator op :right right))))
-     expr))
-
-(defun expression ()
-  `(equality))
-
-(defun equality ()
-  (expand-parse-binary 'comparison :bang-equal :equal-equal))
-
-(defun comparison ()
-  (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
-
-(defun term ()
-  (expand-parse-binary 'factor :minus :plus))
-
-(defun factor ()
-  (expand-parse-binary 'unary :slash :star))
-
-(defun unary ()
-  `(if (match :bang :minus)
-       (let ((op (previous))
-             (right (unary)))
-         (unary-expr :operator op :right right))
-       (primary)))
-
-(defun primary ()
-  `(cond
-     ((match :false) (literal-expr :value 'false))
-     ((match :true) (literal-expr :value t))
-     ((match :nil) (literal-expr :value nil))
-     ((match :number :string) (literal-expr :value (token-literal (previous))))
-     ((match :left-paren)
-      (let ((expr (expression)))
-        (consume :right-paren "Expect ')' after expression.")
-        (grouping-expr :expression expr)))
-     (t
-      (throw-error (peek) "Expect expression."))))
