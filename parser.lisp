@@ -33,61 +33,113 @@
 
 ;;; * Parser
 
-(defmacro with-grammar (&body body)
-  (let ((rules '(expression equality comparison term factor unary primary)))
-    `(labels ,(mapcar (lambda (rule) `(,rule () ,(funcall rule))) rules)
-       ,@body)))
-
-(define-condition parse-errer (error) ())
-
-;; TODO make a defgrammar macro
-
+;; TODO why is eval-when required?
 (eval-when
     (:compile-toplevel
      :load-toplevel
      :execute)
-  (defun expand-parse-binary (rule &rest types)
-    `(let ((expr (,rule)))
-       (loop :while (match ,@types)
-             :do (let ((op (previous))
-                       (right (,rule)))
-                   (setf expr (binary-expr :left expr :operator op :right right))))
-       expr))
+  (defvar *grammars* nil))
 
-  (defun expression ()
-    `(equality))
+(define-condition lox-parse-error (error) ())
 
-  (defun equality ()
-    (expand-parse-binary 'comparison :bang-equal :equal-equal))
+(defmacro with-grammar (&body body)
+  (let ((rules (reverse (mapcar #'car *grammars*))))
+    `(labels ,(mapcar (lambda (rule) `(,rule () (progn ,@(cdr (assoc rule *grammars*))))) rules)
+       ,@body)))
 
-  (defun comparison ()
-    (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
+(defmacro defgrammar (name &body body)
+  `(push (cons ',name ',body) *grammars*))
 
-  (defun term ()
-    (expand-parse-binary 'factor :minus :plus))
+(defgrammar expression
+  (equality))
 
-  (defun factor ()
-    (expand-parse-binary 'unary :slash :star))
+(defgrammar equality
+  (expand-parse-binary comparison :bang-equal :equal-equal))
 
-  (defun unary ()
-    `(if (match :bang :minus)
-         (let ((op (previous))
-               (right (unary)))
-           (unary-expr :operator op :right right))
-         (primary)))
+(defgrammar comparison
+  (expand-parse-binary term :greater :greater-equal :less :less-equal))
 
-  (defun primary ()
-    `(cond
-       ((match :false) (literal-expr :value 'false))
-       ((match :true) (literal-expr :value t))
-       ((match :nil) (literal-expr :value nil))
-       ((match :number :string) (literal-expr :value (token-literal (previous))))
-       ((match :left-paren)
-        (let ((expr (expression)))
-          (consume :right-paren "Expect ')' after expression.")
-          (grouping-expr :expression expr)))
-       (t
-        (throw-error (peek) "Expect expression.")))))
+(defgrammar term
+  (expand-parse-binary factor :minus :plus))
+
+(defgrammar factor
+  (expand-parse-binary unary :slash :star))
+
+(defgrammar unary
+  (if (match :bang :minus)
+      (let ((op (previous))
+            (right (unary)))
+        (unary-expr :operator op :right right))
+      (primary)))
+
+(defgrammar primary
+  (cond
+    ((match :false) (literal-expr :value 'false))
+    ((match :true) (literal-expr :value t))
+    ((match :nil) (literal-expr :value nil))
+    ((match :number :string) (literal-expr :value (token-literal (previous))))
+    ((match :left-paren)
+     (let ((expr (expression)))
+       (consume :right-paren "Expect ')' after expression.")
+       (grouping-expr :expression expr)))
+    (t
+     (throw-error (peek) "Expect expression."))))
+
+(defmacro expand-parse-binary (rule &rest types)
+  `(let ((expr (,rule)))
+     (loop :while (match ,@types)
+           :do (let ((op (previous))
+                     (right (,rule)))
+                 (setf expr (binary-expr :left expr :operator op :right right))))
+     expr))
+
+;; (eval-when
+;;     (:compile-toplevel
+;;      :load-toplevel
+;;      :execute)
+;;   (defun expand-parse-binary (rule &rest types)
+;;     `(let ((expr (,rule)))
+;;        (loop :while (match ,@types)
+;;              :do (let ((op (previous))
+;;                        (right (,rule)))
+;;                    (setf expr (binary-expr :left expr :operator op :right right))))
+;;        expr))
+
+;;   (defun expression ()
+;;     `(equality))
+
+;;   (defun equality ()
+;;     (expand-parse-binary 'comparison :bang-equal :equal-equal))
+
+;;   (defun comparison ()
+;;     (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
+
+;;   (defun term ()
+;;     (expand-parse-binary 'factor :minus :plus))
+
+;;   (defun factor ()
+;;     (expand-parse-binary 'unary :slash :star))
+
+;;   (defun unary ()
+;;     `(if (match :bang :minus)
+;;          (let ((op (previous))
+;;                (right (unary)))
+;;            (unary-expr :operator op :right right))
+;;          (primary)))
+
+;;   (defun primary ()
+;;     `(cond
+;;        ((match :false) (literal-expr :value 'false))
+;;        ((match :true) (literal-expr :value t))
+;;        ((match :nil) (literal-expr :value nil))
+;;        ((match :number :string) (literal-expr :value (token-literal (previous))))
+;;        ((match :left-paren)
+;;         (let ((expr (expression)))
+;;           (consume :right-paren "Expect ')' after expression.")
+;;           (grouping-expr :expression expr)))
+;;        (t
+;;         (throw-error (peek) "Expect expression."))))
+;;   )
 
 ;; expression     → equality ;
 ;; equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -137,7 +189,7 @@
                (aref tokens (- current 1)))
              (throw-error (token msg)
                (report-error token msg)
-               (error 'parse-error))
+               (error 'lox-parse-error))
              (consume (type msg)
                (if (check type)
                    (advance)
@@ -157,6 +209,5 @@
                                      (eq (token-type (peek)) :print)
                                      (eq (token-type (peek)) :return))
                            (advance)))))
-      ;; TODO handle parse-error condition
-      (with-grammar
-        (expression)))))
+      ;; TODO handle lox-parse-error condition
+      (with-grammar (expression)))))
