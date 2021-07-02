@@ -93,54 +93,6 @@
                  (setf expr (binary-expr :left expr :operator op :right right))))
      expr))
 
-;; (eval-when
-;;     (:compile-toplevel
-;;      :load-toplevel
-;;      :execute)
-;;   (defun expand-parse-binary (rule &rest types)
-;;     `(let ((expr (,rule)))
-;;        (loop :while (match ,@types)
-;;              :do (let ((op (previous))
-;;                        (right (,rule)))
-;;                    (setf expr (binary-expr :left expr :operator op :right right))))
-;;        expr))
-
-;;   (defun expression ()
-;;     `(equality))
-
-;;   (defun equality ()
-;;     (expand-parse-binary 'comparison :bang-equal :equal-equal))
-
-;;   (defun comparison ()
-;;     (expand-parse-binary 'term :greater :greater-equal :less :less-equal))
-
-;;   (defun term ()
-;;     (expand-parse-binary 'factor :minus :plus))
-
-;;   (defun factor ()
-;;     (expand-parse-binary 'unary :slash :star))
-
-;;   (defun unary ()
-;;     `(if (match :bang :minus)
-;;          (let ((op (previous))
-;;                (right (unary)))
-;;            (unary-expr :operator op :right right))
-;;          (primary)))
-
-;;   (defun primary ()
-;;     `(cond
-;;        ((match :false) (literal-expr :value 'false))
-;;        ((match :true) (literal-expr :value t))
-;;        ((match :nil) (literal-expr :value nil))
-;;        ((match :number :string) (literal-expr :value (token-literal (previous))))
-;;        ((match :left-paren)
-;;         (let ((expr (expression)))
-;;           (consume :right-paren "Expect ')' after expression.")
-;;           (grouping-expr :expression expr)))
-;;        (t
-;;         (throw-error (peek) "Expect expression."))))
-;;   )
-
 ;; expression     → equality ;
 ;; equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 ;; comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
