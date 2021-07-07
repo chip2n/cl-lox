@@ -54,6 +54,7 @@
         :right (literal-expr :value 2)))))
 
 (define-test pretty-print-unary
+  :parent pretty-print
   (is string= "(- 1)"
       (pretty-print
        (unary-expr
@@ -61,11 +62,13 @@
         :right (literal-expr :value 1)))))
 
 (define-test pretty-print-grouping
+  :parent pretty-print
   (is string= "(group 1)"
       (pretty-print
        (grouping-expr :expression (literal-expr :value 1)))))
 
 (define-test pretty-print-nested
+  :parent pretty-print
   (is string= "(+ (- 1) 2)"
       (pretty-print
        (binary-expr
