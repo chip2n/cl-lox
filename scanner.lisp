@@ -16,6 +16,7 @@
     ;; Single-character tokens.
     :left-paren :right-paren :left-brace :right-brace
     :comma :dot :minus :plus :semicolon :slash :star
+    :question-mark :colon
 
     ;; One or two character tokens.
     :bang :bang-equal
@@ -95,6 +96,8 @@
           (#\+ (push-token :plus))
           (#\; (push-token :semicolon))
           (#\* (push-token :star))
+          (#\? (push-token :question-mark))
+          (#\: (push-token :colon))
           (#\! (push-token (if (match #\=) :bang-equal :bang)))
           (#\= (push-token (if (match #\=) :equal-equal :equal)))
           (#\< (push-token (if (match #\=) :less-equal :less)))

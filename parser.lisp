@@ -26,12 +26,19 @@
                              `(,(alexandria:make-keyword (car slot)) ,(car slot)))
                            slots))))))
 
+(defexpr ternary ((condition :type expr) (true-branch :type expr) (false-branch :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
 
 (defgeneric expr= (e1 e2))
+
+(defmethod expr= ((e1 ternary-expr) (e2 ternary-expr))
+  (and
+   (expr= (slot-value e1 'condition) (slot-value e2 'condition))
+   (expr= (slot-value e1 'true-branch) (slot-value e2 'true-branch))
+   (expr= (slot-value e1 'false-branch) (slot-value e2 'false-branch))))
 
 (defmethod expr= ((e1 binary-expr) (e2 binary-expr))
   (and
@@ -50,7 +57,7 @@
    (token= (slot-value e1 'token) (slot-value e2 'token))
    (expr= (slot-value e1 'right) (slot-value e2 'right))))
 
-(defmethod print-object ((obj binary-expr) out)
+(defmethod print-object ((obj expr) out)
   (print-unreadable-object (obj out :type t)
     (format out "~a" (pretty-print obj))))
 
@@ -69,6 +76,7 @@
     `(labels ,(mapcar (lambda (rule) `(,rule () (progn ,@(cdr (assoc rule *grammars*))))) rules)
        ,@body)))
 
+;; TODO Clean up duplicated forms
 (defmacro defgrammar (name &body body)
   `(eval-when
        (:compile-toplevel
@@ -88,7 +96,17 @@
   (expand-parse-binary expression :comma))
 
 (defgrammar expression
-  (equality))
+  (ternary))
+
+(defgrammar ternary
+  (let ((expr (equality)))
+    (if (match :question-mark)
+        (let ((true-branch (expression)))
+          (unless (match :colon)
+            (error "No matching : to ? in ternary operator."))
+          (let ((false-branch (expression)))
+            (ternary-expr :condition expr :true-branch true-branch :false-branch false-branch)))
+        expr)))
 
 (defgrammar equality
   (expand-parse-binary comparison :bang-equal :equal-equal))
@@ -171,17 +189,29 @@
 
 (define-test parser)
 
-(define-test parser-1
+(define-test parser-comma
   :parent parser
   (is expr=
       (parse (scan-tokens "1 + 2, 3 + 4"))
       (binary-expr
        :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
-        :left (binary-expr
-               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-               :left (literal-expr :value 1)
-               :right (literal-expr :value 2))
-        :right (binary-expr
+       :left (binary-expr
+              :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+              :left (literal-expr :value 1)
+              :right (literal-expr :value 2))
+       :right (binary-expr
                :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
                :left (literal-expr :value 3)
                :right (literal-expr :value 4)))))
+
+(define-test parser-ternary
+  :parent parser
+  (is expr=
+      (parse (scan-tokens "1 < 2 ? 3 : 4"))
+      (ternary-expr
+       :condition (binary-expr
+                   :operator (make-instance 'token :lexeme "<" :type :less :literal nil)
+                   :left (literal-expr :value 1)
+                   :right (literal-expr :value 2))
+       :true-branch (literal-expr :value 3)
+       :false-branch (literal-expr :value 4))))
