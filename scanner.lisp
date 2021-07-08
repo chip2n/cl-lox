@@ -35,7 +35,13 @@
   ((type :type token-type :initarg :type :accessor token-type)
    (lexeme :type string :initarg :lexeme :accessor token-lexeme)
    (literal :initarg :literal :accessor token-literal)
-   (line :type integer :initarg :line :accessor token-line)))
+   (line :type integer :initarg :line :initform 0 :accessor token-line)))
+
+(defun token= (t1 t2)
+  (and
+   (eql (slot-value t1 'type) (slot-value t2 'type))
+   (string= (slot-value t1 'lexeme) (slot-value t2 'lexeme))
+   (string= (slot-value t1 'literal) (slot-value t2 'literal))))
 
 (defmethod print-object ((obj token) out)
   (with-slots (type lexeme literal) obj

@@ -31,9 +31,31 @@
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
 
+(defgeneric expr= (e1 e2))
+
+(defmethod expr= ((e1 binary-expr) (e2 binary-expr))
+  (and
+   (expr= (slot-value e1 'left) (slot-value e2 'left))
+   (token= (slot-value e1 'operator) (slot-value e2 'operator))
+   (expr= (slot-value e1 'right) (slot-value e2 'right))))
+
+(defmethod expr= ((e1 grouping-expr) (e2 grouping-expr))
+  (expr= (slot-value e1 'expression) (slot-value e2 'expression)))
+
+(defmethod expr= ((e1 literal-expr) (e2 literal-expr))
+  (eql (slot-value e1 'value) (slot-value e2 'value)))
+
+(defmethod expr= ((e1 unary-expr) (e2 unary-expr))
+  (and
+   (token= (slot-value e1 'token) (slot-value e2 'token))
+   (expr= (slot-value e1 'right) (slot-value e2 'right))))
+
+(defmethod print-object ((obj binary-expr) out)
+  (print-unreadable-object (obj out :type t)
+    (format out "~a" (pretty-print obj))))
+
 ;;; * Parser
 
-;; TODO why is eval-when required?
 (eval-when
     (:compile-toplevel
      :load-toplevel
@@ -43,12 +65,27 @@
 (define-condition lox-parse-error (error) ())
 
 (defmacro with-grammar (&body body)
-  (let ((rules (reverse (mapcar #'car *grammars*))))
+  (let ((rules (remove-duplicates (reverse (mapcar #'car *grammars*)))))
     `(labels ,(mapcar (lambda (rule) `(,rule () (progn ,@(cdr (assoc rule *grammars*))))) rules)
        ,@body)))
 
 (defmacro defgrammar (name &body body)
-  `(push (cons ',name ',body) *grammars*))
+  `(eval-when
+       (:compile-toplevel
+        :load-toplevel
+        :execute)
+       (push (cons ',name ',body) *grammars*)))
+
+(defmacro expand-parse-binary (rule &rest types)
+  `(let ((expr (,rule)))
+     (loop :while (match ,@types)
+           :do (let ((op (previous))
+                     (right (,rule)))
+                 (setf expr (binary-expr :left expr :operator op :right right))))
+     expr))
+
+(defgrammar comma
+  (expand-parse-binary expression :comma))
 
 (defgrammar expression
   (equality))
@@ -85,39 +122,6 @@
     (t
      (throw-error (peek) "Expect expression."))))
 
-(defmacro expand-parse-binary (rule &rest types)
-  `(let ((expr (,rule)))
-     (loop :while (match ,@types)
-           :do (let ((op (previous))
-                     (right (,rule)))
-                 (setf expr (binary-expr :left expr :operator op :right right))))
-     expr))
-
-;; expression     → equality ;
-;; equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-;; comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-;; term           → factor ( ( "-" | "+" ) factor )* ;
-;; factor         → unary ( ( "/" | "*" ) unary )* ;
-;; unary          → ( "!" | "-" ) unary
-;;                | primary ;
-;; primary        → NUMBER | STRING | "true" | "false" | "nil"
-;;                | "(" expression ")" ;
-
-;; In C, a block is a statement form that allows you to pack a series of statements
-;; where a single one is expected. The comma operator is an analogous syntax for
-;; expressions. A comma-separated series of expressions can be given where a single
-;; expression is expected (except inside a function call’s argument list). At
-;; runtime, the comma operator evaluates the left operand and discards the
-;; result. Then it evaluates and returns the right operand.
-
-;; Add support for comma expressions. Give them the same precedence and
-;; associativity as in C. Write the grammar, and then implement the necessary
-;; parsing code.
-
-
-;; Below unary?
-;; comma         → expression ( "," expression )* ;
-
 (defun parse (tokens)
   (let ((tokens (make-array (length tokens) :initial-contents tokens))
         (current 0))
@@ -151,15 +155,33 @@
                ;; Discard tokens until we think we've found a statement boundary
                ;; TODO Do this check in a better way :D
                (loop :while (not (at-end?))
-                     :do (unless (or (eq (token-type (previous)) :semicolon)
-                                     (eq (token-type (peek)) :class)
-                                     (eq (token-type (peek)) :fun)
-                                     (eq (token-type (peek)) :var)
-                                     (eq (token-type (peek)) :for)
-                                     (eq (token-type (peek)) :if)
-                                     (eq (token-type (peek)) :while)
-                                     (eq (token-type (peek)) :print)
-                                     (eq (token-type (peek)) :return))
-                           (advance)))))
+                     :do (if (or (eq (token-type (previous)) :semicolon)
+                                 (eq (token-type (peek)) :class)
+                                 (eq (token-type (peek)) :fun)
+                                 (eq (token-type (peek)) :var)
+                                 (eq (token-type (peek)) :for)
+                                 (eq (token-type (peek)) :if)
+                                 (eq (token-type (peek)) :while)
+                                 (eq (token-type (peek)) :print)
+                                 (eq (token-type (peek)) :return))
+                             (return)
+                             (advance)))))
       ;; TODO handle lox-parse-error condition
-      (with-grammar (expression)))))
+      (with-grammar (comma)))))
+
+(define-test parser)
+
+(define-test parser-1
+  :parent parser
+  (is expr=
+      (parse (scan-tokens "1 + 2, 3 + 4"))
+      (binary-expr
+       :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
+        :left (binary-expr
+               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+               :left (literal-expr :value 1)
+               :right (literal-expr :value 2))
+        :right (binary-expr
+               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+               :left (literal-expr :value 3)
+               :right (literal-expr :value 4)))))

@@ -39,6 +39,7 @@
   :parent pretty-print
   (is string= "1"
       (pretty-print (literal-expr :value 1))))
+
 (define-test pretty-print-literal-string
   :parent pretty-print
   (is string= "\"hello\""
