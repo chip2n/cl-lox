@@ -9,6 +9,11 @@
 (defgeneric pretty-print (expr)
   (:documentation "Print AST using Lisp syntax."))
 
+(defmethod pretty-print :around (expr)
+  (if (valid? expr)
+      (call-next-method)
+      "<<INVALID EXPR>>"))
+
 (defmethod pretty-print ((expr literal-expr))
   (with-slots (value) expr
     (if value

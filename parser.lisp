@@ -32,7 +32,15 @@
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
 
-(defgeneric expr= (e1 e2))
+(defgeneric valid? (expr)
+  (:documentation "Check if expression is valid.")
+  (:method (expr) t))
+
+(defmethod valid? ((expr binary-expr))
+  (slot-value expr 'left))
+
+(defgeneric expr= (e1 e2)
+  (:method (e1 e2) (eql e1 e2)))
 
 (defmethod expr= ((e1 ternary-expr) (e2 ternary-expr))
   (and
@@ -85,12 +93,19 @@
        (push (cons ',name ',body) *grammars*)))
 
 (defmacro expand-parse-binary (rule &rest types)
-  `(let ((expr (,rule)))
-     (loop :while (match ,@types)
-           :do (let ((op (previous))
-                     (right (,rule)))
-                 (setf expr (binary-expr :left expr :operator op :right right))))
-     expr))
+  `(labels ((run ()
+              (let ((expr (,rule)))
+                (loop :while (match ,@types)
+                      :do (let ((op (previous))
+                                (right (,rule)))
+                            (setf expr (binary-expr :left expr :operator op :right right))))
+                expr)))
+     (if (match ,@types)
+         ;; error production
+         (progn
+           (report-error (previous) "No left hand side for binary operator")
+           (binary-expr :left nil :operator (previous) :right (run)))
+         (run))))
 
 (defgrammar comma
   (expand-parse-binary expression :comma))
@@ -215,3 +230,12 @@
                    :right (literal-expr :value 2))
        :true-branch (literal-expr :value 3)
        :false-branch (literal-expr :value 4))))
+
+(define-test parser-binary-lhs-missing
+  :parent parser
+  (is expr=
+      (parse (scan-tokens "+ 1"))
+      (binary-expr
+       :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+       :left nil
+       :right (literal-expr :value 1))))
