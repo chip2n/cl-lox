@@ -13,7 +13,8 @@
 
 (defun run-file (path)
   (run (uiop:read-file-string path))
-  (when *error* (exit :code 65)))
+  (when *error* (uiop:quit 65))
+  (when *runtime-error* (uiop:quit 70)))
 
 (defun run-prompt ()
   (loop :do
@@ -30,9 +31,10 @@
   (let* ((tokens (scan-tokens source))
          (expr (parse tokens)))
     (unless *error*
-      (format t "~a~%" (pretty-print expr)))))
+      (interpret expr))))
 
 (defvar *error* nil)
+(defvar *runtime-error* nil)
 
 (defgeneric report-error (location msg))
 
@@ -47,3 +49,8 @@
 (defun report (line where msg)
   (format t "[line ~a] Error~a: ~a~%" line where msg)
   (setf *error* t))
+
+(defun report-runtime-error (c)
+  (with-slots (token msg) c
+    (format t "~a~%[line ~a]" msg (token-line token)))
+  (setf *runtime-error* t))

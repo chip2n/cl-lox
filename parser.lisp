@@ -62,7 +62,7 @@
 
 (defmethod expr= ((e1 unary-expr) (e2 unary-expr))
   (and
-   (token= (slot-value e1 'token) (slot-value e2 'token))
+   (token= (slot-value e1 'operator) (slot-value e2 'operator))
    (expr= (slot-value e1 'right) (slot-value e2 'right))))
 
 (defmethod print-object ((obj expr) out)
@@ -93,19 +93,13 @@
        (push (cons ',name ',body) *grammars*)))
 
 (defmacro expand-parse-binary (rule &rest types)
-  `(labels ((run ()
-              (let ((expr (,rule)))
-                (loop :while (match ,@types)
-                      :do (let ((op (previous))
-                                (right (,rule)))
-                            (setf expr (binary-expr :left expr :operator op :right right))))
-                expr)))
-     (if (match ,@types)
-         ;; error production
-         (progn
-           (report-error (previous) "No left hand side for binary operator")
-           (binary-expr :left nil :operator (previous) :right (run)))
-         (run))))
+  `(let ((expr (handler-case (,rule)
+                 (lox-parse-error () nil))))
+     (loop :while (match ,@types)
+           :do (let ((op (previous))
+                     (right (,rule)))
+                 (setf expr (binary-expr :left expr :operator op :right right))))
+     expr))
 
 (defgrammar comma
   (expand-parse-binary expression :comma))
@@ -218,6 +212,13 @@
                :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
                :left (literal-expr :value 3)
                :right (literal-expr :value 4)))))
+
+(define-test parser-unary
+  :parent parser
+  (is expr=
+      (parse (scan-tokens "-1"))
+      (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                  :right (literal-expr :value 1))))
 
 (define-test parser-ternary
   :parent parser
