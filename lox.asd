@@ -9,4 +9,5 @@
                (:file "scanner")
                (:file "parser")
                (:file "pprint")
+               (:file "interpreter")
                (:file "core")))

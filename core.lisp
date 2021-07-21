@@ -29,9 +29,12 @@
 
 (defun run (source)
   (let* ((tokens (scan-tokens source))
-         (expr (parse tokens)))
+         (stmts (parse tokens)))
+
     (unless *error*
-      (interpret expr))))
+      (interpret stmts))
+
+    (setf *error* nil)))
 
 (defvar *error* nil)
 (defvar *runtime-error* nil)
@@ -54,3 +57,9 @@
   (with-slots (token msg) c
     (format t "~a~%[line ~a]" msg (token-line token)))
   (setf *runtime-error* t))
+
+(define-test run-simple
+  (let ((source "print \"one\";
+print true;
+print 2 + 1;"))
+    (run source)))

@@ -2,18 +2,16 @@
 
 (in-package #:lox)
 
-(defclass expr () ())
-
 ;;; * Generating the classes
 
 ;;; We're using lisp macros instead of coding a separate application to generate
 ;;; all required classes as it's done in the book.
 
-(defmacro defexpr (name slots)
-  "Define a class (with name `<NAME>-EXPR')."
-  (let ((sym (alexandria:symbolicate name "-EXPR")))
+(defmacro defast (name parent slots)
+  "Define a class (with name `<NAME>-<PARENT>')."
+  (let ((sym (alexandria:symbolicate name "-" parent)))
     `(progn
-       (defclass ,sym (expr)
+       (defclass ,sym (,parent)
          ,(mapcar (lambda (slot) `(,(car slot)
                               ,@(when (cadr slot) (list :type (caddr slot)))
                               :initarg
@@ -26,11 +24,26 @@
                              `(,(alexandria:make-keyword (car slot)) ,(car slot)))
                            slots))))))
 
+(defclass expr () ())
+
+(defmacro defexpr (name slots)
+  "Define a class (with name `<NAME>-EXPR')."
+  `(defast ,name expr ,slots))
+
 (defexpr ternary ((condition :type expr) (true-branch :type expr) (false-branch :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
+
+(defclass stmt () ())
+
+(defmacro defstmt (name slots)
+  "Define a class (with name `<NAME>-STMT')."
+  `(defast ,name stmt ,slots))
+
+(defstmt print ((expression)))
+(defstmt expr ((expression)))
 
 (defgeneric valid? (expr)
   (:documentation "Check if expression is valid.")
@@ -80,7 +93,7 @@
 (define-condition lox-parse-error (error) ())
 
 (defmacro with-grammar (&body body)
-  (let ((rules (remove-duplicates (reverse (mapcar #'car *grammars*)))))
+  (let ((rules (reverse (remove-duplicates (mapcar #'car *grammars*)))))
     `(labels ,(mapcar (lambda (rule) `(,rule () (progn ,@(cdr (assoc rule *grammars*))))) rules)
        ,@body)))
 
@@ -100,6 +113,21 @@
                      (right (,rule)))
                  (setf expr (binary-expr :left expr :operator op :right right))))
      expr))
+
+(defgrammar statement
+  (if (match :print)
+      (print-statement)
+      (expr-statement)))
+
+(defgrammar print-statement
+  (let ((value (comma)))
+    (consume :semicolon "Expect ';' after value.")
+    (print-stmt :expression value)))
+
+(defgrammar expr-statement
+  (let ((expr (comma)))
+    (consume :semicolon "Expect ';' after value.")
+    (expr-stmt :expression expr)))
 
 (defgrammar comma
   (expand-parse-binary expression :comma))
@@ -194,7 +222,8 @@
                              (return)
                              (advance)))))
       ;; TODO handle lox-parse-error condition
-      (with-grammar (comma)))))
+      (with-grammar
+        (loop :until (at-end?) :collect (statement))))))
 
 (define-test parser)
 
