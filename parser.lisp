@@ -52,6 +52,27 @@
 (defmethod valid? ((expr binary-expr))
   (slot-value expr 'left))
 
+(defgeneric ast= (o1 o2))
+
+(defmethod ast= ((o1 list) (o2 list))
+  (or (eql o1 o2)
+      (and (ast= (car o1) (car o2))
+           (ast= (cdr o1) (cdr o2)))))
+
+(defmethod ast= ((o1 stmt) (o2 stmt))
+  (stmt= o1 o2))
+
+(defmethod ast= ((o1 expr) (o2 expr))
+  (expr= o1 o2))
+
+(defgeneric stmt= (s1 s2))
+
+(defmethod stmt= ((s1 print-stmt) (s2 print-stmt))
+  (expr= (slot-value s1 'expression) (slot-value s2 'expression)))
+
+(defmethod stmt= ((s1 expr-stmt) (s2 expr-stmt))
+  (expr= (slot-value s1 'expression) (slot-value s2 'expression)))
+
 (defgeneric expr= (e1 e2)
   (:method (e1 e2) (eql e1 e2)))
 
@@ -229,43 +250,49 @@
 
 (define-test parser-comma
   :parent parser
-  (is expr=
-      (parse (scan-tokens "1 + 2, 3 + 4"))
-      (binary-expr
-       :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
-       :left (binary-expr
-              :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-              :left (literal-expr :value 1)
-              :right (literal-expr :value 2))
-       :right (binary-expr
-               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-               :left (literal-expr :value 3)
-               :right (literal-expr :value 4)))))
+  (is ast=
+      (parse (scan-tokens "1 + 2, 3 + 4;"))
+      (list
+       (expr-stmt :expression (binary-expr
+                               :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
+                               :left (binary-expr
+                                      :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                                      :left (literal-expr :value 1)
+                                      :right (literal-expr :value 2))
+                               :right (binary-expr
+                                       :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                                       :left (literal-expr :value 3)
+                                       :right (literal-expr :value 4)))))))
 
 (define-test parser-unary
   :parent parser
-  (is expr=
-      (parse (scan-tokens "-1"))
-      (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-                  :right (literal-expr :value 1))))
+  (is ast=
+      (parse (scan-tokens "-1;"))
+      (list
+       (expr-stmt :expression
+                  (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                              :right (literal-expr :value 1))))))
 
 (define-test parser-ternary
   :parent parser
-  (is expr=
-      (parse (scan-tokens "1 < 2 ? 3 : 4"))
-      (ternary-expr
-       :condition (binary-expr
-                   :operator (make-instance 'token :lexeme "<" :type :less :literal nil)
-                   :left (literal-expr :value 1)
-                   :right (literal-expr :value 2))
-       :true-branch (literal-expr :value 3)
-       :false-branch (literal-expr :value 4))))
+  (is ast=
+      (parse (scan-tokens "1 < 2 ? 3 : 4;"))
+      (list
+       (expr-stmt :expression
+                  (ternary-expr
+                   :condition (binary-expr
+                               :operator (make-instance 'token :lexeme "<" :type :less :literal nil)
+                               :left (literal-expr :value 1)
+                               :right (literal-expr :value 2))
+                   :true-branch (literal-expr :value 3)
+                   :false-branch (literal-expr :value 4))))))
 
 (define-test parser-binary-lhs-missing
   :parent parser
-  (is expr=
-      (parse (scan-tokens "+ 1"))
-      (binary-expr
-       :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-       :left nil
-       :right (literal-expr :value 1))))
+  (is ast=
+      (parse (scan-tokens "+ 1;"))
+      (list
+       (expr-stmt :expression (binary-expr
+                               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                               :left nil
+                               :right (literal-expr :value 1))))))

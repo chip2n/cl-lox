@@ -28,13 +28,11 @@
       (setf *error* nil))))
 
 (defun run (source)
+  (setf *error* nil)
   (let* ((tokens (scan-tokens source))
          (stmts (parse tokens)))
 
-    (unless *error*
-      (interpret stmts))
-
-    (setf *error* nil)))
+    (unless *error* (interpret stmts))))
 
 (defvar *error* nil)
 (defvar *runtime-error* nil)
@@ -59,7 +57,10 @@
   (setf *runtime-error* t))
 
 (define-test run-simple
-  (let ((source "print \"one\";
+  (let ((output (with-output-to-string (s)
+                  (let ((*lox-stdout* s))
+                    (let ((source "print \"one\";
 print true;
 print 2 + 1;"))
-    (run source)))
+                      (run source))))))
+    (is string= "onetrue3" output)))

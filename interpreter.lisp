@@ -2,6 +2,8 @@
 
 (in-package #:lox)
 
+(defvar *lox-stdout* *standard-output*)
+
 (define-condition lox-runtime-error (error)
   ((token :type token)
    (msg :type string)))
@@ -19,7 +21,7 @@
 
 (defmethod evaluate ((stmt print-stmt))
   (let ((value (evaluate (slot-value stmt 'expression))))
-    (princ (stringify value))))
+    (princ (stringify value) *lox-stdout*)))
 
 (defmethod evaluate ((expr literal-expr))
   (slot-value expr 'value))

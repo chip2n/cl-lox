@@ -42,20 +42,18 @@
                         ,@(alexandria:mappend (lambda (e) (list " " (pretty-print e))) exprs)
                         ")")))
 
-(define-test pretty-print)
+(define-test pprint)
 
 (define-test pretty-print-literal-number
-  :parent pretty-print
-  (is string= "1"
-      (pretty-print (literal-expr :value 1))))
+  :parent pprint
+  (is string= "1" (pretty-print (literal-expr :value 1))))
 
 (define-test pretty-print-literal-string
-  :parent pretty-print
-  (is string= "\"hello\""
-      (pretty-print (literal-expr :value "hello"))))
+  :parent pprint
+  (is string= "\"hello\"" (pretty-print (literal-expr :value "hello"))))
 
 (define-test pretty-print-binary
-  :parent pretty-print
+  :parent pprint
   (is string= "(+ 1 2)"
       (pretty-print
        (binary-expr
@@ -64,7 +62,7 @@
         :right (literal-expr :value 2)))))
 
 (define-test pretty-print-unary
-  :parent pretty-print
+  :parent pprint
   (is string= "(- 1)"
       (pretty-print
        (unary-expr
@@ -72,13 +70,13 @@
         :right (literal-expr :value 1)))))
 
 (define-test pretty-print-grouping
-  :parent pretty-print
+  :parent pprint
   (is string= "(group 1)"
       (pretty-print
        (grouping-expr :expression (literal-expr :value 1)))))
 
 (define-test pretty-print-nested
-  :parent pretty-print
+  :parent pprint
   (is string= "(+ (- 1) 2)"
       (pretty-print
        (binary-expr
@@ -114,15 +112,12 @@
 (defun stackify (&rest items)
   (str:join " " items))
 
-(define-test rpn-print)
-
 (define-test rpn-print-literal
-  :parent rpn-print
-  (is string= "1"
-      (rpn-print (literal-expr :value 1))))
+  :parent pprint
+  (is string= "1" (rpn-print (literal-expr :value 1))))
 
 (define-test rpn-print-unary
-  :parent rpn-print
+  :parent pprint
   (is string= "1 -"
       (rpn-print
        (unary-expr
@@ -130,7 +125,7 @@
         :right (literal-expr :value 1)))))
 
 (define-test rpn-print-binary
-  :parent rpn-print
+  :parent pprint
   (is string= "1 2 +"
       (rpn-print
        (binary-expr
@@ -139,13 +134,13 @@
         :right (literal-expr :value 2)))))
 
 (define-test rpn-print-group
-  :parent rpn-print
+  :parent pprint
   (is string= "1"
       (rpn-print
        (grouping-expr :expression (literal-expr :value 1)))))
 
 (define-test rpn-print-nested
-  :parent rpn-print
+  :parent pprint
   (is string= "1 2 + 4 3 - *"
       (rpn-print
        (binary-expr
