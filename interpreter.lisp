@@ -3,10 +3,25 @@
 (in-package #:lox)
 
 (defvar *lox-stdout* *standard-output*)
+(defvar *lox-env* (list (make-hash-table :test 'equal)))
 
 (define-condition lox-runtime-error (error)
-  ((token :type token)
-   (msg :type string)))
+  ((token :type token
+          :initarg :token
+          :reader lox-runtime-error-token)
+   (msg :type string
+        :initarg :msg
+        :reader lox-runtime-error-msg)))
+
+(defun env-define (lexeme value)
+  (setf (gethash lexeme (car *lox-env*)) value))
+
+(defun env-get (name)
+  (let ((lexeme (token-lexeme name)))
+    (multiple-value-bind (value exists?) (gethash lexeme (car *lox-env*))
+      (if exists?
+          value
+          (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme))))))
 
 (defun interpret (stmts)
   (handler-case
@@ -16,12 +31,23 @@
 
 (defgeneric evaluate (expr))
 
+(defmethod evaluate ((stmt var-stmt))
+  (let ((value nil))
+    (with-slots (initializer name) stmt
+      (if initializer
+          (setf value (evaluate initializer)))
+      (env-define (token-lexeme name) value))
+    nil))
+
 (defmethod evaluate ((stmt expr-stmt))
   (evaluate (slot-value stmt 'expression)))
 
 (defmethod evaluate ((stmt print-stmt))
   (let ((value (evaluate (slot-value stmt 'expression))))
     (princ (stringify value) *lox-stdout*)))
+
+(defmethod evaluate ((expr variable-expr))
+  (env-get (slot-value expr 'name)))
 
 (defmethod evaluate ((expr literal-expr))
   (slot-value expr 'value))
@@ -65,7 +91,7 @@
          (cond
            ((and (numberp l) (numberp r)) (+ l r))
            ((and (stringp l) (stringp r)) (str:concat l r))
-           (t (error 'lox-runtime-error operator "Operands must be two numbers or two strings."))))
+           (t (error 'lox-runtime-error :token operator :msg "Operands must be two numbers or two strings."))))
         (:slash
          (check-number-operands operator l r)
          (/ l r))

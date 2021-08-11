@@ -36,6 +36,10 @@
   (with-slots (expression) expr
     (parenthesize "group" expression)))
 
+(defmethod pretty-print ((expr variable-expr))
+  (with-slots (name) expr
+    (parenthesize "var" name)))
+
 (defun parenthesize (name &rest exprs)
   (apply #'str:concat `("("
                         ,name

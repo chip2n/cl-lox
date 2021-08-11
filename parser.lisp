@@ -35,6 +35,7 @@
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr unary ((operator :type token) (right :type expr)))
+(defexpr variable ((name :type token)))
 
 (defclass stmt () ())
 
@@ -42,8 +43,9 @@
   "Define a class (with name `<NAME>-STMT')."
   `(defast ,name stmt ,slots))
 
-(defstmt print ((expression)))
-(defstmt expr ((expression)))
+(defstmt print ((expression :type expr)))
+(defstmt expr ((expression :type expr)))
+(defstmt var ((name :type token) (initializer :type expr)))
 
 (defgeneric valid? (expr)
   (:documentation "Check if expression is valid.")
@@ -135,6 +137,23 @@
                  (setf expr (binary-expr :left expr :operator op :right right))))
      expr))
 
+(defgrammar declaration
+  (handler-case
+      (if (match :var)
+          (var-declaration)
+          (statement))
+    (lox-parse-error ()
+      (synchronize)
+      nil)))
+
+(defgrammar var-declaration
+  (let ((name (consume :identifier "Expect variable name."))
+        (initializer nil))
+    (if (match :equal)
+        (setf initializer (expression)))
+    (consume :semicolon "Expect ';' after variable declaration.")
+    (var-stmt :name name :initializer initializer)))
+
 (defgrammar statement
   (if (match :print)
       (print-statement)
@@ -195,8 +214,9 @@
      (let ((expr (expression)))
        (consume :right-paren "Expect ')' after expression.")
        (grouping-expr :expression expr)))
-    (t
-     (throw-error (peek) "Expect expression."))))
+    ((match :identifier)
+     (variable-expr :name (previous)))
+    (t (throw-error (peek) "Expect expression."))))
 
 (defun parse (tokens)
   (let ((tokens (make-array (length tokens) :initial-contents tokens))
@@ -244,7 +264,7 @@
                              (advance)))))
       ;; TODO handle lox-parse-error condition
       (with-grammar
-        (loop :until (at-end?) :collect (statement))))))
+        (loop :until (at-end?) :collect (declaration))))))
 
 (define-test parser)
 
