@@ -30,6 +30,7 @@
   "Define a class (with name `<NAME>-EXPR')."
   `(defast ,name expr ,slots))
 
+(defexpr assign ((name :type token) (value :type expr)))
 (defexpr ternary ((condition :type expr) (true-branch :type expr) (false-branch :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr grouping ((expression :type expr)))
@@ -173,7 +174,17 @@
   (expand-parse-binary expression :comma))
 
 (defgrammar expression
-  (ternary))
+  (assignment))
+
+(defgrammar assignment
+  (let ((expr (equality)))
+    (if (match :equal)
+        (let ((equals (previous))
+              (value (assignment)))
+          (if (eq (type-of expr) 'variable-expr)
+              (assign-expr :name (slot-value expr 'name) :value value)
+              (report-error equals "Invalid assignment target.")))
+        expr)))
 
 (defgrammar ternary
   (let ((expr (equality)))
@@ -218,6 +229,7 @@
      (variable-expr :name (previous)))
     (t (throw-error (peek) "Expect expression."))))
 
+;; TODO Can we re-expand this after adding/changing the defgrammars?
 (defun parse (tokens)
   (let ((tokens (make-array (length tokens) :initial-contents tokens))
         (current 0))

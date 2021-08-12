@@ -23,6 +23,13 @@
           value
           (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme))))))
 
+;; TODO use reader macro to reuse hashmap place
+(defun env-assign (name value)
+  (let ((lexeme (token-lexeme name)))
+    (if (nth-value 1 (gethash lexeme (car *lox-env*)))
+        (setf (gethash lexeme (car *lox-env*)) value)
+        (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme)))))
+
 (defun interpret (stmts)
   (handler-case
       (loop :for stmt :in stmts
@@ -98,6 +105,12 @@
         (:star
          (check-number-operands operator l r)
          (* l r))))))
+
+(defmethod evaluate ((expr assign-expr))
+  (with-slots (name value) expr
+    (let ((result (evaluate value)))
+      (env-assign name result)
+      result)))
 
 (defun truthy? (obj)
   (not (or (null obj) (eq obj 'false))))
