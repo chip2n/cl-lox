@@ -57,10 +57,38 @@
   (setf *runtime-error* t))
 
 (define-test run-simple
-  (let ((output (with-output-to-string (s)
-                  (let ((*lox-stdout* s))
-                    (let ((source "print \"one\";
+    (let* ((source "
+print \"one\";
 print true;
-print 2 + 1;"))
-                      (run source))))))
-    (is string= "onetrue3" output)))
+print 2 + 1;")
+           (output (with-output-to-string (s)
+                     (let ((*lox-stdout* s))
+                       (run source)))))
+      (is string= "onetrue3" output)))
+
+(define-test run-scope
+    (let* ((source "
+var a = \"global a\";
+var b = \"global b\";
+var c = \"global c\";
+{
+  var a = \"outer a\";
+  var b = \"outer b\";
+  {
+    var a = \"inner a\";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
+print a;
+print b;
+print c;
+")
+           (output (with-output-to-string (s)
+                     (let ((*lox-stdout* s))
+                       (run source)))))
+      (is string= "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" output)))

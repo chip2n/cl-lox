@@ -3,6 +3,9 @@
 (in-package #:lox)
 
 (defvar *lox-stdout* *standard-output*)
+
+;;; * Environment
+
 (defvar *lox-env* (list (make-hash-table :test 'equal)))
 
 (define-condition lox-runtime-error (error)
@@ -18,10 +21,22 @@
 
 (defun env-get (name)
   (let ((lexeme (token-lexeme name)))
-    (multiple-value-bind (value exists?) (gethash lexeme (car *lox-env*))
-      (if exists?
-          value
-          (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme))))))
+    (labels ((lookup (env)
+               (unless env
+                 (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme)))
+               (multiple-value-bind (value exists?) (gethash lexeme (car env))
+                 (if exists? value (lookup (cdr env))))))
+      (lookup *lox-env*))))
+
+(defun env-push ()
+  (let ((env (make-hash-table :test 'equal)))
+    (push env *lox-env*)
+    env))
+
+(defun env-pop ()
+  (when (= (length *lox-env*) 1)
+    (error "Cannot pop environment - already at global"))
+  (pop *lox-env*))
 
 ;; TODO use reader macro to reuse hashmap place
 (defun env-assign (name value)
@@ -29,6 +44,18 @@
     (if (nth-value 1 (gethash lexeme (car *lox-env*)))
         (setf (gethash lexeme (car *lox-env*)) value)
         (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme)))))
+
+(define-test interpreter)
+
+(define-test interpreter-env
+  :parent interpreter
+  (let ((*lox-env* nil))
+    (env-push)
+    (env-define "a" 1)
+    (env-push)
+    (is = (env-get (make-instance 'token :lexeme "a")) 1)))
+
+;;; * Interpreter
 
 (defun interpret (stmts)
   (handler-case
@@ -52,6 +79,13 @@
 (defmethod evaluate ((stmt print-stmt))
   (let ((value (evaluate (slot-value stmt 'expression))))
     (princ (stringify value) *lox-stdout*)))
+
+;; TODO We can probably just use dynamic variable with let binding
+(defmethod evaluate ((stmt block-stmt))
+  (env-push)
+  (unwind-protect
+       (loop :for s :in (slot-value stmt 'stmts) :do (evaluate s))
+    (env-pop)))
 
 (defmethod evaluate ((expr variable-expr))
   (env-get (slot-value expr 'name)))

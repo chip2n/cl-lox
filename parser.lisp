@@ -46,6 +46,7 @@
 
 (defstmt print ((expression :type expr)))
 (defstmt expr ((expression :type expr)))
+(defstmt block ((stmts :type list)))
 (defstmt var ((name :type token) (initializer :type expr)))
 
 (defgeneric valid? (expr)
@@ -156,9 +157,10 @@
     (var-stmt :name name :initializer initializer)))
 
 (defgrammar statement
-  (if (match :print)
-      (print-statement)
-      (expr-statement)))
+  (cond
+    ((match :print) (print-statement))
+    ((match :left-brace) (block-statement))
+    (t (expr-statement))))
 
 (defgrammar print-statement
   (let ((value (comma)))
@@ -169,6 +171,14 @@
   (let ((expr (comma)))
     (consume :semicolon "Expect ';' after value.")
     (expr-stmt :expression expr)))
+
+(defgrammar block-statement
+  (let ((stmts nil))
+    (loop :while (and (not (check :right-brace))
+                      (not (at-end?)))
+          :do (push (declaration) stmts))
+    (consume :right-brace "Expect '}' after block.")
+    (block-stmt :stmts (nreverse stmts))))
 
 (defgrammar comma
   (expand-parse-binary expression :comma))
