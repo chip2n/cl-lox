@@ -56,18 +56,19 @@
     (format t "~a~%[line ~a]" msg (token-line token)))
   (setf *runtime-error* t))
 
+(defun expect-output (expected source)
+  (let* ((output (with-output-to-string (s)
+                   (let ((*lox-stdout* s)) (run source)))))
+    (is string= expected output)))
+
 (define-test run-simple
-    (let* ((source "
+    (expect-output "onetrue3" "
 print \"one\";
 print true;
-print 2 + 1;")
-           (output (with-output-to-string (s)
-                     (let ((*lox-stdout* s))
-                       (run source)))))
-      (is string= "onetrue3" output)))
+print 2 + 1;"))
 
 (define-test run-scope
-    (let* ((source "
+    (expect-output "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
 var a = \"global a\";
 var b = \"global b\";
 var c = \"global c\";
@@ -87,8 +88,26 @@ var c = \"global c\";
 print a;
 print b;
 print c;
-")
-           (output (with-output-to-string (s)
-                     (let ((*lox-stdout* s))
-                       (run source)))))
-      (is string= "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" output)))
+"))
+
+(define-test run-if-conditional-true
+    (expect-output "true branch" "
+if (true) {
+  print \"true branch\";
+} else {
+  print \"false branch\";
+}"))
+
+(define-test run-if-conditional-true
+    (expect-output "false branch" "
+if (false) {
+  print \"true branch\";
+} else {
+  print \"false branch\";
+}"))
+
+(define-test run-if-conditional-no-else
+    (expect-output "" "
+if (false) {
+  print \"true branch\";
+}"))

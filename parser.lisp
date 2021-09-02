@@ -44,6 +44,7 @@
   "Define a class (with name `<NAME>-STMT')."
   `(defast ,name stmt ,slots))
 
+(defstmt if ((condition :type expr) (then-branch :type stmt) (else-branch :type stmt)))
 (defstmt print ((expression :type expr)))
 (defstmt expr ((expression :type expr)))
 (defstmt block ((stmts :type list)))
@@ -158,9 +159,21 @@
 
 (defgrammar statement
   (cond
+    ((match :if) (if-statement))
     ((match :print) (print-statement))
     ((match :left-brace) (block-statement))
     (t (expr-statement))))
+
+(defgrammar if-statement
+  (consume :left-paren "Expect '(' after 'if'.")
+  (let ((condition (expression)))
+    (consume :right-paren "Expect ')' after if condition.")
+
+    (let ((then-branch (statement))
+          (else-branch nil))
+      (when (match :else)
+        (setf else-branch (statement)))
+      (if-stmt :condition condition :then-branch then-branch :else-branch else-branch))))
 
 (defgrammar print-statement
   (let ((value (comma)))

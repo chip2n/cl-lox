@@ -76,6 +76,13 @@
 (defmethod evaluate ((stmt expr-stmt))
   (evaluate (slot-value stmt 'expression)))
 
+(defmethod evaluate ((stmt if-stmt))
+  (with-slots (condition then-branch else-branch) stmt
+    (if (truthy? (evaluate condition))
+        (evaluate then-branch)
+        (when else-branch (evaluate else-branch)))
+    nil))
+
 (defmethod evaluate ((stmt print-stmt))
   (let ((value (evaluate (slot-value stmt 'expression))))
     (princ (stringify value) *lox-stdout*)))
