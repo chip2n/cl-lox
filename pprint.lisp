@@ -28,10 +28,6 @@
   (with-slots (operator left right) expr
     (parenthesize (token-lexeme operator) left right)))
 
-(defmethod pretty-print ((expr ternary-expr))
-  (with-slots (condition true-branch false-branch) expr
-    (parenthesize "ternary" condition true-branch false-branch)))
-
 (defmethod pretty-print ((expr grouping-expr))
   (with-slots (expression) expr
     (parenthesize "group" expression)))

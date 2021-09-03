@@ -31,7 +31,6 @@
   `(defast ,name expr ,slots))
 
 (defexpr assign ((name :type token) (value :type expr)))
-(defexpr ternary ((condition :type expr) (true-branch :type expr) (false-branch :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
@@ -82,12 +81,6 @@
 (defgeneric expr= (e1 e2)
   (:method (e1 e2) (eql e1 e2)))
 
-(defmethod expr= ((e1 ternary-expr) (e2 ternary-expr))
-  (and
-   (expr= (slot-value e1 'condition) (slot-value e2 'condition))
-   (expr= (slot-value e1 'true-branch) (slot-value e2 'true-branch))
-   (expr= (slot-value e1 'false-branch) (slot-value e2 'false-branch))))
-
 (defmethod expr= ((e1 binary-expr) (e2 binary-expr))
   (and
    (expr= (slot-value e1 'left) (slot-value e2 'left))
@@ -119,6 +112,58 @@
 
 (define-condition lox-parse-error (error) ())
 
+;; Written as a macro so we can easily re-expand it when recompiling defgrammar forms
+(defmacro define-parser ()
+  `(defun parse (tokens)
+     (let ((tokens (make-array (length tokens) :initial-contents tokens))
+           (current 0))
+       (labels ((match (&rest types)
+                  (loop :for type :in types
+                        :do (when (check type)
+                              (advance)
+                              (return t))))
+                (check (type)
+                  (unless (at-end?)
+                    (eq (token-type (peek)) type)))
+                (advance ()
+                  (unless (at-end?)
+                    (incf current))
+                  (previous))
+                (at-end? ()
+                  (eq (token-type (peek)) :eof))
+                (peek ()
+                  (aref tokens current))
+                (previous ()
+                  (aref tokens (- current 1)))
+                (throw-error (token msg)
+                  (report-error token msg)
+                  (error 'lox-parse-error))
+                (consume (type msg)
+                  (if (check type)
+                      (advance)
+                      (throw-error (peek) msg)))
+                (synchronize ()
+                  (advance)
+                  ;; Discard tokens until we think we've found a statement boundary
+                  ;; TODO Do this check in a better way :D
+                  (loop :while (not (at-end?))
+                        :do (if (or (eq (token-type (previous)) :semicolon)
+                                    (eq (token-type (peek)) :class)
+                                    (eq (token-type (peek)) :fun)
+                                    (eq (token-type (peek)) :var)
+                                    (eq (token-type (peek)) :for)
+                                    (eq (token-type (peek)) :if)
+                                    (eq (token-type (peek)) :while)
+                                    (eq (token-type (peek)) :print)
+                                    (eq (token-type (peek)) :return))
+                                (return)
+                                (advance)))))
+         ;; TODO handle lox-parse-error condition
+         (with-grammar
+           (loop :until (at-end?) :collect (declaration)))))))
+
+(define-parser)
+
 (defmacro with-grammar (&body body)
   (let ((rules (reverse (remove-duplicates (mapcar #'car *grammars*)))))
     `(labels ,(mapcar (lambda (rule) `(,rule () (progn ,@(cdr (assoc rule *grammars*))))) rules)
@@ -130,7 +175,8 @@
        (:compile-toplevel
         :load-toplevel
         :execute)
-       (push (cons ',name ',body) *grammars*)))
+     (push (cons ',name ',body) *grammars*)
+     (define-parser)))
 
 (defmacro expand-parse-binary (rule &rest types)
   `(let ((expr (handler-case (,rule)
@@ -210,17 +256,6 @@
               (report-error equals "Invalid assignment target.")))
         expr)))
 
-;; TODO remove
-(defgrammar ternary
-  (let ((expr (equality)))
-    (if (match :question-mark)
-        (let ((true-branch (expression)))
-          (unless (match :colon)
-            (error "No matching : to ? in ternary operator."))
-          (let ((false-branch (expression)))
-            (ternary-expr :condition expr :true-branch true-branch :false-branch false-branch)))
-        expr)))
-
 (defgrammar logical-or
   (let ((expr (logical-and)))
     (loop :while (match :or)
@@ -270,54 +305,7 @@
      (variable-expr :name (previous)))
     (t (throw-error (peek) "Expect expression."))))
 
-;; TODO Can we re-expand this after adding/changing the defgrammars?
-(defun parse (tokens)
-  (let ((tokens (make-array (length tokens) :initial-contents tokens))
-        (current 0))
-    (labels ((match (&rest types)
-               (loop :for type :in types
-                     :do (when (check type)
-                           (advance)
-                           (return t))))
-             (check (type)
-               (unless (at-end?)
-                 (eq (token-type (peek)) type)))
-             (advance ()
-               (unless (at-end?)
-                 (incf current))
-               (previous))
-             (at-end? ()
-               (eq (token-type (peek)) :eof))
-             (peek ()
-               (aref tokens current))
-             (previous ()
-               (aref tokens (- current 1)))
-             (throw-error (token msg)
-               (report-error token msg)
-               (error 'lox-parse-error))
-             (consume (type msg)
-               (if (check type)
-                   (advance)
-                   (throw-error (peek) msg)))
-             (synchronize ()
-               (advance)
-               ;; Discard tokens until we think we've found a statement boundary
-               ;; TODO Do this check in a better way :D
-               (loop :while (not (at-end?))
-                     :do (if (or (eq (token-type (previous)) :semicolon)
-                                 (eq (token-type (peek)) :class)
-                                 (eq (token-type (peek)) :fun)
-                                 (eq (token-type (peek)) :var)
-                                 (eq (token-type (peek)) :for)
-                                 (eq (token-type (peek)) :if)
-                                 (eq (token-type (peek)) :while)
-                                 (eq (token-type (peek)) :print)
-                                 (eq (token-type (peek)) :return))
-                             (return)
-                             (advance)))))
-      ;; TODO handle lox-parse-error condition
-      (with-grammar
-        (loop :until (at-end?) :collect (declaration))))))
+;; * Tests
 
 (define-test parser)
 
@@ -345,20 +333,6 @@
        (expr-stmt :expression
                   (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
                               :right (literal-expr :value 1))))))
-
-(define-test parser-ternary
-  :parent parser
-  (is ast=
-      (parse (scan-tokens "1 < 2 ? 3 : 4;"))
-      (list
-       (expr-stmt :expression
-                  (ternary-expr
-                   :condition (binary-expr
-                               :operator (make-instance 'token :lexeme "<" :type :less :literal nil)
-                               :left (literal-expr :value 1)
-                               :right (literal-expr :value 2))
-                   :true-branch (literal-expr :value 3)
-                   :false-branch (literal-expr :value 4))))))
 
 (define-test parser-binary-lhs-missing
   :parent parser
