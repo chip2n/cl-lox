@@ -100,6 +100,13 @@
 (defmethod evaluate ((expr literal-expr))
   (slot-value expr 'value))
 
+(defmethod evaluate ((expr logical-expr))
+  (with-slots (left operator right) expr
+    (let ((left-result (evaluate left)))
+      (if (eq (token-type operator) :or)
+          (if (truthy? left-result) left-result (evaluate right))
+          (if (not (truthy? left-result)) left-result (evaluate right))))))
+
 (defmethod evaluate ((expr grouping-expr))
   (evaluate (slot-value expr 'expression)))
 

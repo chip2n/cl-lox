@@ -35,6 +35,7 @@
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
+(defexpr logical ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr unary ((operator :type token) (right :type expr)))
 (defexpr variable ((name :type token)))
 
@@ -200,7 +201,7 @@
   (assignment))
 
 (defgrammar assignment
-  (let ((expr (equality)))
+  (let ((expr (logical-or)))
     (if (match :equal)
         (let ((equals (previous))
               (value (assignment)))
@@ -209,6 +210,7 @@
               (report-error equals "Invalid assignment target.")))
         expr)))
 
+;; TODO remove
 (defgrammar ternary
   (let ((expr (equality)))
     (if (match :question-mark)
@@ -218,6 +220,22 @@
           (let ((false-branch (expression)))
             (ternary-expr :condition expr :true-branch true-branch :false-branch false-branch)))
         expr)))
+
+(defgrammar logical-or
+  (let ((expr (logical-and)))
+    (loop :while (match :or)
+          :do (let ((operator (previous))
+                    (right (logical-and)))
+                (setf expr (logical-expr :left expr :operator operator :right right))))
+    expr))
+
+(defgrammar logical-and
+  (let ((expr (equality)))
+    (loop :while (match :and)
+          :do (let ((operator (previous))
+                    (right (equality)))
+                (setf expr (logical-expr :left expr :operator operator :right right))))
+    expr))
 
 (defgrammar equality
   (expand-parse-binary comparison :bang-equal :equal-equal))

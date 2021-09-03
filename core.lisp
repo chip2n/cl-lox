@@ -98,7 +98,7 @@ if (true) {
   print \"false branch\";
 }"))
 
-(define-test run-if-conditional-true
+(define-test run-if-conditional-false
     (expect-output "false branch" "
 if (false) {
   print \"true branch\";
@@ -110,4 +110,20 @@ if (false) {
     (expect-output "" "
 if (false) {
   print \"true branch\";
+}"))
+
+(define-test run-logical-or
+    (expect-output "1" "
+if (false or true) {
+  print \"1\";
+} else {
+  print \"2\";
+}"))
+
+(define-test run-logical-and
+    (expect-output "2" "
+if (false and true) {
+  print \"1\";
+} else {
+  print \"2\";
 }"))
