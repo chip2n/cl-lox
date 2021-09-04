@@ -46,6 +46,7 @@
 
 (defstmt if ((condition :type expr) (then-branch :type stmt) (else-branch :type stmt)))
 (defstmt print ((expression :type expr)))
+(defstmt while ((condition :type expr) (body :type stmt)))
 (defstmt expr ((expression :type expr)))
 (defstmt block ((stmts :type list)))
 (defstmt var ((name :type token) (initializer :type expr)))
@@ -208,6 +209,7 @@
   (cond
     ((match :if) (if-statement))
     ((match :print) (print-statement))
+    ((match :while) (while-statement))
     ((match :left-brace) (block-statement))
     (t (expr-statement))))
 
@@ -226,6 +228,12 @@
   (let ((value (comma)))
     (consume :semicolon "Expect ';' after value.")
     (print-stmt :expression value)))
+
+(defgrammar while-statement
+  (consume :left-paren "Expect '(' awter 'while'.")
+  (let ((condition (expression)))
+    (consume :right-paren "Expect ')' after condition.")
+    (while-stmt :condition condition :body (statement))))
 
 (defgrammar expr-statement
   (let ((expr (comma)))

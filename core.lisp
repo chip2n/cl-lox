@@ -127,3 +127,12 @@ if (false and true) {
 } else {
   print \"2\";
 }"))
+
+(define-test run-while
+    (expect-output "012" "
+var i = 0;
+while (i < 3) {
+  print i;
+  i = i + 1;
+}
+"))

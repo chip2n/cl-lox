@@ -43,7 +43,10 @@
   (let ((lexeme (token-lexeme name)))
     (if (nth-value 1 (gethash lexeme (car *lox-env*)))
         (setf (gethash lexeme (car *lox-env*)) value)
-        (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme)))))
+        (if (cdr *lox-env*)
+            (let ((*lox-env* (cdr *lox-env*)))
+              (env-assign name value))
+            (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme))))))
 
 (define-test interpreter)
 
@@ -54,6 +57,15 @@
     (env-define "a" 1)
     (env-push)
     (is = (env-get (make-instance 'token :lexeme "a")) 1)))
+
+(define-test interpreter-env-assign-outer-scope
+  :parent interpreter
+  (let ((*lox-env* nil))
+    (env-push)
+    (env-define "a" 1)
+    (env-push)
+    (env-assign (make-instance 'token :lexeme "a") 2)
+    (is = (env-get (make-instance 'token :lexeme "a")) 2)))
 
 ;;; * Interpreter
 
@@ -86,6 +98,13 @@
 (defmethod evaluate ((stmt print-stmt))
   (let ((value (evaluate (slot-value stmt 'expression))))
     (princ (stringify value) *lox-stdout*)))
+
+(defmethod evaluate ((stmt while-stmt))
+  (with-slots (condition body) stmt
+    (loop :while (truthy? (evaluate condition))
+          :do
+             (format t "doing it")
+             (evaluate body))))
 
 ;; TODO We can probably just use dynamic variable with let binding
 (defmethod evaluate ((stmt block-stmt))
