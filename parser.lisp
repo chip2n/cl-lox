@@ -207,11 +207,43 @@
 
 (defgrammar statement
   (cond
+    ((match :for) (for-statement))
     ((match :if) (if-statement))
     ((match :print) (print-statement))
     ((match :while) (while-statement))
     ((match :left-brace) (block-statement))
     (t (expr-statement))))
+
+(defgrammar for-statement
+  (consume :left-paren "Expect '(' after 'for'.")
+  (let ((initializer nil)
+        (condition nil)
+        (increment nil))
+
+    (setf initializer
+          (if (match :var)
+              (var-declaration)
+              (expr-statement)))
+
+    (unless (check :semicolon)
+        (setf condition (expression)))
+    (consume :semicolon "Expect ';' after loop condition")
+
+    (unless (check :right-paren)
+      (setf increment (expression)))
+    (consume :right-paren "Expect ')' after for clauses.")
+
+    (let ((body (statement)))
+      (when increment
+        (setf body (block-stmt :stmts (list body (expr-stmt :expression increment)))))
+
+      (unless condition (setf condition (literal-expr :value t)))
+      (setf body (while-stmt :condition condition :body body))
+
+      (when initializer
+        (setf body (block-stmt :stmts (list initializer body))))
+
+      body)))
 
 (defgrammar if-statement
   (consume :left-paren "Expect '(' after 'if'.")

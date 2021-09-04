@@ -136,3 +136,10 @@ while (i < 3) {
   i = i + 1;
 }
 "))
+
+(define-test run-for
+    (expect-output "012" "
+for (var i = 0; i < 3; i = i + 1) {
+  print i;
+}
+"))
