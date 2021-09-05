@@ -14,7 +14,11 @@
           :reader lox-runtime-error-token)
    (msg :type string
         :initarg :msg
-        :reader lox-runtime-error-msg)))
+        :reader lox-runtime-error-msg))
+  (:report (lambda (condition stream)
+             (format stream "Lox runtime error on token ~a: ~a"
+                     (lox-runtime-error-token condition)
+                     (lox-runtime-error-msg condition)))))
 
 (defun env-define (lexeme value)
   (setf (gethash lexeme (car *lox-env*)) value))
