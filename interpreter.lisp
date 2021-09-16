@@ -8,6 +8,30 @@
 
 (defvar *lox-env* (list (make-hash-table :test 'equal)))
 
+(defun env-define (lexeme value)
+  (setf (gethash lexeme (car *lox-env*)) value))
+
+(defclass callable ()
+  ((arity :type int :initarg :arity
+          :reader callable-arity)
+   (fun :type function :initarg :fun)))
+
+(defun callable? (obj)
+  (eq (type-of obj) 'callable))
+
+(defmacro lox-defun (name args &body body)
+  (let ((gargs (gensym)))
+    `(let ((*lox-env* (last *lox-env*)))
+       (env-define
+        ,name
+        (make-instance 'callable :arity ,(length args)
+                                 :fun (lambda (,gargs)
+                                        (destructuring-bind ,args ,gargs
+                                          ,@body)))))))
+
+(lox-defun "clock" ()
+  (coerce (get-universal-time) 'float))
+
 (define-condition lox-runtime-error (error)
   ((token :type token
           :initarg :token
@@ -19,9 +43,6 @@
              (format stream "Lox runtime error on token ~a: ~a"
                      (lox-runtime-error-token condition)
                      (lox-runtime-error-msg condition)))))
-
-(defun env-define (lexeme value)
-  (setf (gethash lexeme (car *lox-env*)) value))
 
 (defun env-get (name)
   (let ((lexeme (token-lexeme name)))
@@ -41,6 +62,10 @@
   (when (= (length *lox-env*) 1)
     (error "Cannot pop environment - already at global"))
   (pop *lox-env*))
+
+(defmacro with-new-env (&body body)
+  `(let ((*lox-env* (cons (make-hash-table :test 'equal) *lox-env*)))
+     ,@body))
 
 ;; TODO use reader macro to reuse hashmap place
 (defun env-assign (name value)
@@ -110,12 +135,23 @@
              (format t "doing it")
              (evaluate body))))
 
-;; TODO We can probably just use dynamic variable with let binding
+;; TODO We can probably just use dynamic variable with let binding (use with-new-env macro)
 (defmethod evaluate ((stmt block-stmt))
   (env-push)
   (unwind-protect
        (loop :for s :in (slot-value stmt 'stmts) :do (evaluate s))
     (env-pop)))
+
+(defmethod evaluate ((stmt fun-stmt))
+  (with-slots (name params body) stmt
+    (let ((arity (length params))
+          (fun (lambda (args)
+                 (with-new-env
+                   (loop :for i :upto (length params) :do
+                     (env-define (token-lexeme (nth i params))
+                                 (nth i args)))
+                   (evaluate body)))))
+      (env-define (token-lexeme name) (make-instance 'callable :arity arity :fun fun)))))
 
 (defmethod evaluate ((expr variable-expr))
   (env-get (slot-value expr 'name)))
@@ -141,6 +177,16 @@
         (:minus
          (check-number-operand operator r)
          (- r))))))
+
+(defmethod evaluate ((expr call-expr))
+  (let ((callee (evaluate (slot-value expr 'callee)))
+        (args (loop :for arg :in (slot-value expr 'arguments)
+                    :collect (evaluate arg))))
+    (unless (callable? callee)
+      (error 'lox-runtime-error :token (slot-value expr 'paren) :msg "Can only call functions and classes."))
+    (unless (= #1=(length args) #2=(callable-arity callee))
+      (error 'lox-runtime-error :token (slot-value expr 'paren) :msg (format nil "Expected ~a arguments but got ~a." #2# #1#)))
+    (funcall (slot-value callee 'fun) args)))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr

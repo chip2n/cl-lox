@@ -32,6 +32,7 @@
 
 (defexpr assign ((name :type token) (value :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
+(defexpr call ((callee :type expr) (paren :type token) (arguments :type list)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr logical ((left :type expr) (operator :type token) (right :type expr)))
@@ -49,6 +50,7 @@
 (defstmt while ((condition :type expr) (body :type stmt)))
 (defstmt expr ((expression :type expr)))
 (defstmt block ((stmts :type list)))
+(defstmt fun ((name :token) (params :type list) (body :type list)))
 (defstmt var ((name :type token) (initializer :type expr)))
 
 (defgeneric valid? (expr)
@@ -190,12 +192,28 @@
 
 (defgrammar declaration
   (handler-case
-      (if (match :var)
-          (var-declaration)
-          (statement))
+      (cond
+        ((match :fun) (fun-declaration))
+        ((match :var) (var-declaration))
+        (t (statement)))
     (lox-parse-error ()
       (synchronize)
       nil)))
+
+;; TODO we want to pass "kind" to separate functions from methods (for more accurate error)
+(defgrammar fun-declaration
+  (let ((name (consume :identifier "Expect function name."))
+        (params nil))
+    (consume :left-paren "Expect '(' after function name.")
+    (unless (check :right-paren)
+      (loop :do (when (>= (length params) 255)
+                  (error (peek) "Can't have more than 255 parameters."))
+                (push (consume :identifier "Expect parameter name.") params)
+            :while (match :comma))
+      (setf params (nreverse params)))
+    (consume :right-paren "Expect ')' after parameters.")
+    (consume :left-brace "Expect '{' before function name.")
+    (fun-stmt :name name :params params :body (block-statement))))
 
 (defgrammar var-declaration
   (let ((name (consume :identifier "Expect variable name."))
@@ -272,6 +290,7 @@
     (consume :semicolon "Expect ';' after value.")
     (expr-stmt :expression expr)))
 
+;;; TODO technically not really a statement?
 (defgrammar block-statement
   (let ((stmts nil))
     (loop :while (and (not (check :right-brace))
@@ -329,7 +348,25 @@
       (let ((op (previous))
             (right (unary)))
         (unary-expr :operator op :right right))
-      (primary)))
+      (call)))
+
+(defgrammar call
+  (labels ((finish-call (callee)
+             (let ((args nil))
+               (unless (check :right-paren)
+                 (loop :do (when (>= (length args) 255)
+                             (error (peek) "Can't have more than 255 arguments."))
+                           (push (expression) args)
+                       :while (match :comma))
+                 (setf args (nreverse args)))
+               (let ((paren (consume :right-paren "Expect ')' after arguments.")))
+                 (call-expr :callee callee :paren paren :arguments args)))))
+    (let ((expr (primary)))
+      (loop :do
+        (if (match :left-paren)
+            (setf expr (finish-call expr))
+            (return)))
+      expr)))
 
 (defgrammar primary
   (cond
