@@ -147,7 +147,7 @@
     (let ((arity (length params))
           (fun (lambda (args)
                  (with-new-env
-                   (loop :for i :upto (length params) :do
+                   (loop :for i :upto (1- (length params)) :do
                      (env-define (token-lexeme (nth i params))
                                  (nth i args)))
                    (evaluate body)))))

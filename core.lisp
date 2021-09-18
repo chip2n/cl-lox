@@ -143,3 +143,21 @@ for (var i = 0; i < 3; i = i + 1) {
   print i;
 }
 "))
+
+(define-test run-fun
+    (expect-output "123" "
+fun count(n) {
+  if (n > 1) count(n - 1);
+  print n;
+}
+count(3);
+"))
+
+(define-test run-fun2
+    (expect-output "Hi, Dear Reader!" "
+fun sayHi(first, last) {
+  print \"Hi, \" + first + \" \" + last + \"!\";
+}
+
+sayHi(\"Dear\", \"Reader\");
+"))
