@@ -161,3 +161,14 @@ fun sayHi(first, last) {
 
 sayHi(\"Dear\", \"Reader\");
 "))
+
+(define-test run-fun-return
+    (expect-output "01123581321345589144233377610987159725844181" "
+fun fib(n) {
+  if (n <= 1) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+for (var i = 0; i < 20; i = i + 1) {
+  print fib(i);
+}"))

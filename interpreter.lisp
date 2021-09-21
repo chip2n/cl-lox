@@ -32,6 +32,12 @@
 (lox-defun "clock" ()
   (coerce (get-universal-time) 'float))
 
+(define-condition lox-return (error)
+  ((value :type value
+          :type expr
+          :initarg :value
+          :reader lox-return-value)))
+
 (define-condition lox-runtime-error (error)
   ((token :type token
           :initarg :token
@@ -128,12 +134,16 @@
   (let ((value (evaluate (slot-value stmt 'expression))))
     (princ (stringify value) *lox-stdout*)))
 
+(defmethod evaluate ((stmt return-stmt))
+  (with-slots (value) stmt
+    (let ((v nil))
+      (when value (setf v (evaluate value)))
+      (error 'lox-return :value v))))
+
 (defmethod evaluate ((stmt while-stmt))
   (with-slots (condition body) stmt
     (loop :while (truthy? (evaluate condition))
-          :do
-             (format t "doing it")
-             (evaluate body))))
+          :do (evaluate body))))
 
 ;; TODO We can probably just use dynamic variable with let binding (use with-new-env macro)
 (defmethod evaluate ((stmt block-stmt))
@@ -186,7 +196,9 @@
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg "Can only call functions and classes."))
     (unless (= #1=(length args) #2=(callable-arity callee))
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg (format nil "Expected ~a arguments but got ~a." #2# #1#)))
-    (funcall (slot-value callee 'fun) args)))
+    (handler-case
+        (funcall (slot-value callee 'fun) args)
+    (lox-return (c) (lox-return-value c)))))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr
@@ -205,7 +217,7 @@
          (< l r))
         (:less-equal
          (check-number-operands operator l r)
-         (< l r))
+         (<= l r))
         (:bang-equal (not (equal l r)))
         (:equal-equal (equal l r))
         (:minus
