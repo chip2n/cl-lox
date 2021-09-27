@@ -14,7 +14,8 @@
 (defclass callable ()
   ((arity :type int :initarg :arity
           :reader callable-arity)
-   (fun :type function :initarg :fun)))
+   (fun :type function :initarg :fun)
+   (closure :type list :initarg :closure)))
 
 (defun callable? (obj)
   (eq (type-of obj) 'callable))
@@ -24,10 +25,12 @@
     `(let ((*lox-env* (last *lox-env*)))
        (env-define
         ,name
-        (make-instance 'callable :arity ,(length args)
-                                 :fun (lambda (,gargs)
-                                        (destructuring-bind ,args ,gargs
-                                          ,@body)))))))
+        (make-instance 'callable
+                       :arity ,(length args)
+                       :fun (lambda (,gargs)
+                              (destructuring-bind ,args ,gargs
+                                ,@body))
+                       :closure *lox-env*)))))
 
 (lox-defun "clock" ()
   (coerce (get-universal-time) 'float))
@@ -161,7 +164,10 @@
                      (env-define (token-lexeme (nth i params))
                                  (nth i args)))
                    (evaluate body)))))
-      (env-define (token-lexeme name) (make-instance 'callable :arity arity :fun fun)))))
+      (env-define (token-lexeme name) (make-instance 'callable
+                                                     :arity arity
+                                                     :fun fun
+                                                     :closure *lox-env*)))))
 
 (defmethod evaluate ((expr variable-expr))
   (env-get (slot-value expr 'name)))
@@ -197,7 +203,8 @@
     (unless (= #1=(length args) #2=(callable-arity callee))
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg (format nil "Expected ~a arguments but got ~a." #2# #1#)))
     (handler-case
-        (funcall (slot-value callee 'fun) args)
+        (let ((*lox-env* (slot-value callee 'closure)))
+          (funcall (slot-value callee 'fun) args))
     (lox-return (c) (lox-return-value c)))))
 
 (defmethod evaluate ((expr binary-expr))
