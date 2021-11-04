@@ -32,7 +32,12 @@
   (let* ((tokens (scan-tokens source))
          (stmts (parse tokens)))
 
-    (unless *error* (interpret stmts))))
+    (unless *error*
+      (resolve stmts)
+
+      ;; Resolver can also report errors
+      (unless *error*
+        (interpret stmts)))))
 
 (defvar *error* nil)
 (defvar *runtime-error* nil)
@@ -174,7 +179,7 @@ for (var i = 0; i < 20; i = i + 1) {
 }"))
 
 (define-test run-fun-nested
-    (expect output "?" "
+    (expect-output "12" "
 fun makeCounter() {
   var i = 0;
   fun count() {
@@ -187,3 +192,23 @@ fun makeCounter() {
 var counter = makeCounter();
 counter();
 counter();"))
+
+(define-test run-fun-scoping
+    (expect-output "globalglobal" "
+var a = \"global\";
+{
+  fun showA() {
+    print a;
+  }
+  showA();
+  var a = \"block\";
+  showA();
+}"))
+
+;; TODO This fails - why isn't parachute reporting it properly?
+(define-test run-variable-local-redeclaration
+  (expect-output "" "
+fun bad() {
+  var a = \"first\";
+  var a = \"second\";
+}"))

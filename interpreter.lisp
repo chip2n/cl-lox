@@ -7,6 +7,7 @@
 ;;; * Environment
 
 (defvar *lox-env* (list (make-hash-table :test 'equal)))
+(defvar *lox-locals* (make-hash-table))
 
 (defun env-define (lexeme value)
   (setf (gethash lexeme (car *lox-env*)) value))
@@ -170,7 +171,7 @@
                                                      :closure *lox-env*)))))
 
 (defmethod evaluate ((expr variable-expr))
-  (env-get (slot-value expr 'name)))
+  (lookup-var (slot-value expr 'name) expr))
 
 (defmethod evaluate ((expr literal-expr))
   (slot-value expr 'value))
@@ -244,8 +245,11 @@
 
 (defmethod evaluate ((expr assign-expr))
   (with-slots (name value) expr
-    (let ((result (evaluate value)))
-      (env-assign name result)
+    (let ((result (evaluate value))
+          (distance (gethash expr *lox-locals*)))
+      (if distance
+          (env-assign-at distance name value)
+          (env-globals-assign name value))
       result)))
 
 (defun truthy? (obj)
@@ -264,3 +268,30 @@
     ((null obj) "nil")
     ((eq obj 't) "true")
     (t (format nil "~a" obj))))
+
+(defun interpreter-resolve (expr depth)
+  (setf (gethash expr *lox-locals*) depth))
+
+(defun lookup-var (name expr)
+  (let ((distance (gethash expr *lox-locals*)))
+    (if distance
+        (env-get-at distance (slot-value name 'lexeme))
+        (env-globals-get name))))
+
+(defun env-globals-get (name)
+  (let ((*lox-env* (last *lox-env*)))
+    (env-get name)))
+
+(defun env-globals-assign (name value)
+  (let ((*lox-env* (last *lox-env*)))
+    (env-assign name value)))
+
+(defun env-get-at (distance name)
+  (gethash name (ancestor distance)))
+
+(defun ancestor (distance)
+  (serapeum:drop distance *lox-env*))
+
+(defun env-assign-at (distance name value)
+  (setf (gethash lexeme (ancestor distance))
+        value))
