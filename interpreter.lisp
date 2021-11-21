@@ -87,24 +87,25 @@
               (env-assign name value))
             (error 'lox-runtime-error :token name :msg (format nil "Undefined variable '~a'" lexeme))))))
 
-(define-test interpreter)
+(fiveam:def-suite interpreter
+  :description "Tests for the lox interpreter")
 
-(define-test interpreter-env
-  :parent interpreter
+(fiveam:in-suite interpreter)
+
+(test interpreter-env
   (let ((*lox-env* nil))
     (env-push)
     (env-define "a" 1)
     (env-push)
-    (is = (env-get (make-instance 'token :lexeme "a")) 1)))
+    (is (= (env-get (make-instance 'token :lexeme "a")) 1))))
 
-(define-test interpreter-env-assign-outer-scope
-  :parent interpreter
+(test interpreter-env-assign-outer-scope
   (let ((*lox-env* nil))
     (env-push)
     (env-define "a" 1)
     (env-push)
     (env-assign (make-instance 'token :lexeme "a") 2)
-    (is = (env-get (make-instance 'token :lexeme "a")) 2)))
+    (is (= (env-get (make-instance 'token :lexeme "a")) 2))))
 
 ;;; * Interpreter
 
@@ -206,7 +207,7 @@
     (handler-case
         (let ((*lox-env* (slot-value callee 'closure)))
           (funcall (slot-value callee 'fun) args))
-    (lox-return (c) (lox-return-value c)))))
+      (lox-return (c) (lox-return-value c)))))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr
@@ -290,8 +291,10 @@
   (gethash name (ancestor distance)))
 
 (defun ancestor (distance)
-  (serapeum:drop distance *lox-env*))
+  (nth distance *lox-env*)
+  ;; (serapeum:drop distance *lox-env*)
+  )
 
 (defun env-assign-at (distance name value)
-  (setf (gethash lexeme (ancestor distance))
+  (setf (gethash (token-lexeme name) (ancestor distance))
         value))

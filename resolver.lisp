@@ -15,7 +15,7 @@
 
 (defmethod resolve ((stmt block-stmt))
   (with-new-scope
-   (resolve (slot-value stmt 'statements)))
+   (resolve (slot-value stmt 'stmts)))
   nil)
 
 (defmethod resolve ((stmts cons))
@@ -31,7 +31,7 @@
 
 (defmethod resolve ((expr variable-expr))
   (with-slots (name) expr
-    (when (and (not *scopes*) (var-ready? name))
+    (when (and *scopes* (var-ready? name))
       (report-error name "Can't read local variable in its own initializer."))
     (resolve-local expr name)
     nil))
@@ -147,4 +147,4 @@
                  (interpreter-resolve expr i)))))
 
 (defun has-key? (key hashmap)
-  (nth-value 1 (gethash hashmap key)))
+  (nth-value 1 (gethash key hashmap)))

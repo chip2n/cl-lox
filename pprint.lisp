@@ -34,7 +34,7 @@
 
 (defmethod pretty-print ((expr variable-expr))
   (with-slots (name) expr
-    (parenthesize "var" name)))
+    (token-lexeme name)))
 
 (defun parenthesize (name &rest exprs)
   (apply #'str:concat `("("
@@ -42,49 +42,46 @@
                         ,@(alexandria:mappend (lambda (e) (list " " (pretty-print e))) exprs)
                         ")")))
 
-(define-test pprint)
+(fiveam:def-suite pprint
+  :description "Tests for the lox pretty printer")
 
-(define-test pretty-print-literal-number
-  :parent pprint
-  (is string= "1" (pretty-print (literal-expr :value 1))))
+(fiveam:in-suite pprint)
 
-(define-test pretty-print-literal-string
-  :parent pprint
-  (is string= "\"hello\"" (pretty-print (literal-expr :value "hello"))))
+(test pretty-print-literal-number
+  (is (string= "1" (pretty-print (literal-expr :value 1)))))
 
-(define-test pretty-print-binary
-  :parent pprint
-  (is string= "(+ 1 2)"
-      (pretty-print
-       (binary-expr
-        :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-        :left (literal-expr :value 1)
-        :right (literal-expr :value 2)))))
+(test pretty-print-literal-string
+  (is (string= "\"hello\"" (pretty-print (literal-expr :value "hello")))))
 
-(define-test pretty-print-unary
-  :parent pprint
-  (is string= "(- 1)"
-      (pretty-print
-       (unary-expr
-        :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-        :right (literal-expr :value 1)))))
+(test pretty-print-binary
+  (is (string= "(+ 1 2)"
+               (pretty-print
+                (binary-expr
+                 :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                 :left (literal-expr :value 1)
+                 :right (literal-expr :value 2))))))
 
-(define-test pretty-print-grouping
-  :parent pprint
-  (is string= "(group 1)"
-      (pretty-print
-       (grouping-expr :expression (literal-expr :value 1)))))
+(test pretty-print-unary
+  (is (string= "(- 1)"
+               (pretty-print
+                (unary-expr
+                 :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                 :right (literal-expr :value 1))))))
 
-(define-test pretty-print-nested
-  :parent pprint
-  (is string= "(+ (- 1) 2)"
-      (pretty-print
-       (binary-expr
-        :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-        :left (unary-expr
-               :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-               :right (literal-expr :value 1))
-        :right (literal-expr :value 2)))))
+(test pretty-print-grouping
+  (is (string= "(group 1)"
+               (pretty-print
+                (grouping-expr :expression (literal-expr :value 1))))))
+
+(test pretty-print-nested
+  (is (string= "(+ (- 1) 2)"
+               (pretty-print
+                (binary-expr
+                 :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                 :left (unary-expr
+                        :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                        :right (literal-expr :value 1))
+                 :right (literal-expr :value 2))))))
 
 ;;; * Reverse polish notation printer
 
@@ -112,44 +109,39 @@
 (defun stackify (&rest items)
   (str:join " " items))
 
-(define-test rpn-print-literal
-  :parent pprint
-  (is string= "1" (rpn-print (literal-expr :value 1))))
+(test rpn-print-literal
+  (is (string= "1" (rpn-print (literal-expr :value 1)))))
 
-(define-test rpn-print-unary
-  :parent pprint
-  (is string= "1 -"
-      (rpn-print
-       (unary-expr
-        :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-        :right (literal-expr :value 1)))))
+(test rpn-print-unary
+  (is (string= "1 -"
+               (rpn-print
+                (unary-expr
+                 :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                 :right (literal-expr :value 1))))))
 
-(define-test rpn-print-binary
-  :parent pprint
-  (is string= "1 2 +"
-      (rpn-print
-       (binary-expr
-        :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-        :left (literal-expr :value 1)
-        :right (literal-expr :value 2)))))
+(test rpn-print-binary
+  (is (string= "1 2 +"
+               (rpn-print
+                (binary-expr
+                 :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                 :left (literal-expr :value 1)
+                 :right (literal-expr :value 2))))))
 
-(define-test rpn-print-group
-  :parent pprint
-  (is string= "1"
-      (rpn-print
-       (grouping-expr :expression (literal-expr :value 1)))))
+(test rpn-print-group
+  (is (string= "1"
+               (rpn-print
+                (grouping-expr :expression (literal-expr :value 1))))))
 
-(define-test rpn-print-nested
-  :parent pprint
-  (is string= "1 2 + 4 3 - *"
-      (rpn-print
-       (binary-expr
-        :operator (make-instance 'token :lexeme "*" :type :star :literal nil)
-        :left (grouping-expr :expression (binary-expr
-                                          :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-                                          :left (literal-expr :value 1)
-                                          :right (literal-expr :value 2)))
-        :right (grouping-expr :expression (binary-expr
-                                           :operator (make-instance 'token :lexeme "-" :type :plus :literal nil)
-                                           :left (literal-expr :value 4)
-                                           :right (literal-expr :value 3)))))))
+(test rpn-print-nested
+  (is (string= "1 2 + 4 3 - *"
+               (rpn-print
+                (binary-expr
+                 :operator (make-instance 'token :lexeme "*" :type :star :literal nil)
+                 :left (grouping-expr :expression (binary-expr
+                                                   :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                                                   :left (literal-expr :value 1)
+                                                   :right (literal-expr :value 2)))
+                 :right (grouping-expr :expression (binary-expr
+                                                    :operator (make-instance 'token :lexeme "-" :type :plus :literal nil)
+                                                    :left (literal-expr :value 4)
+                                                    :right (literal-expr :value 3))))))))

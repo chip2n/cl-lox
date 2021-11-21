@@ -394,39 +394,39 @@
 
 ;; * Tests
 
-(define-test parser)
+(fiveam:def-suite parser
+  :description "Tests for the lox parser")
 
-(define-test parser-comma
-  :parent parser
-  (is ast=
-      (parse (scan-tokens "1 + 2, 3 + 4;"))
-      (list
-       (expr-stmt :expression (binary-expr
-                               :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
-                               :left (binary-expr
-                                      :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-                                      :left (literal-expr :value 1)
-                                      :right (literal-expr :value 2))
-                               :right (binary-expr
+(fiveam:in-suite parser)
+
+(test parser-comma
+  (is (ast=
+       (parse (scan-tokens "1 + 2, 3 + 4;"))
+       (list
+        (expr-stmt :expression (binary-expr
+                                :operator (make-instance 'token :lexeme "," :type :comma :literal nil)
+                                :left (binary-expr
                                        :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-                                       :left (literal-expr :value 3)
-                                       :right (literal-expr :value 4)))))))
+                                       :left (literal-expr :value 1)
+                                       :right (literal-expr :value 2))
+                                :right (binary-expr
+                                        :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                                        :left (literal-expr :value 3)
+                                        :right (literal-expr :value 4))))))))
 
-(define-test parser-unary
-  :parent parser
-  (is ast=
-      (parse (scan-tokens "-1;"))
-      (list
-       (expr-stmt :expression
-                  (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-                              :right (literal-expr :value 1))))))
+(test parser-unary
+  (is (ast=
+       (parse (scan-tokens "-1;"))
+       (list
+        (expr-stmt :expression
+                   (unary-expr :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+                               :right (literal-expr :value 1)))))))
 
-(define-test parser-binary-lhs-missing
-  :parent parser
-  (is ast=
-      (parse (scan-tokens "+ 1;"))
-      (list
-       (expr-stmt :expression (binary-expr
-                               :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-                               :left nil
-                               :right (literal-expr :value 1))))))
+(test parser-binary-lhs-missing
+  (is (ast=
+       (parse (scan-tokens "+ 1;"))
+       (list
+        (expr-stmt :expression (binary-expr
+                                :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+                                :left nil
+                                :right (literal-expr :value 1)))))))

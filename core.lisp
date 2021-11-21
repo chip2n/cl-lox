@@ -64,16 +64,21 @@
 (defun expect-output (expected source)
   (let* ((output (with-output-to-string (s)
                    (let ((*lox-stdout* s)) (run source)))))
-    (is string= expected output)))
+    (fiveam:is (string= expected output))))
 
-(define-test run-simple
-    (expect-output "onetrue3" "
+(fiveam:def-suite run
+  :description "Tests for the top level run function")
+
+(fiveam:in-suite run)
+
+(test run-simple
+  (expect-output "onetrue3" "
 print \"one\";
 print true;
 print 2 + 1;"))
 
-(define-test run-scope
-    (expect-output "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
+(test run-scope
+  (expect-output "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
 var a = \"global a\";
 var b = \"global b\";
 var c = \"global c\";
@@ -95,46 +100,46 @@ print b;
 print c;
 "))
 
-(define-test run-if-conditional-true
-    (expect-output "true branch" "
+(test run-if-conditional-true
+  (expect-output "true branch" "
 if (true) {
   print \"true branch\";
 } else {
   print \"false branch\";
 }"))
 
-(define-test run-if-conditional-false
-    (expect-output "false branch" "
+(test run-if-conditional-false
+  (expect-output "false branch" "
 if (false) {
   print \"true branch\";
 } else {
   print \"false branch\";
 }"))
 
-(define-test run-if-conditional-no-else
-    (expect-output "" "
+(test run-if-conditional-no-else
+  (expect-output "" "
 if (false) {
   print \"true branch\";
 }"))
 
-(define-test run-logical-or
-    (expect-output "1" "
+(test run-logical-or
+  (expect-output "1" "
 if (false or true) {
   print \"1\";
 } else {
   print \"2\";
 }"))
 
-(define-test run-logical-and
-    (expect-output "2" "
+(test run-logical-and
+  (expect-output "2" "
 if (false and true) {
   print \"1\";
 } else {
   print \"2\";
 }"))
 
-(define-test run-while
-    (expect-output "012" "
+(test run-while
+  (expect-output "012" "
 var i = 0;
 while (i < 3) {
   print i;
@@ -142,15 +147,15 @@ while (i < 3) {
 }
 "))
 
-(define-test run-for
-    (expect-output "012" "
+(test run-for
+  (expect-output "012" "
 for (var i = 0; i < 3; i = i + 1) {
   print i;
 }
 "))
 
-(define-test run-fun
-    (expect-output "123" "
+(test run-fun
+  (expect-output "123" "
 fun count(n) {
   if (n > 1) count(n - 1);
   print n;
@@ -158,8 +163,8 @@ fun count(n) {
 count(3);
 "))
 
-(define-test run-fun2
-    (expect-output "Hi, Dear Reader!" "
+(test run-fun2
+  (expect-output "Hi, Dear Reader!" "
 fun sayHi(first, last) {
   print \"Hi, \" + first + \" \" + last + \"!\";
 }
@@ -167,8 +172,8 @@ fun sayHi(first, last) {
 sayHi(\"Dear\", \"Reader\");
 "))
 
-(define-test run-fun-return
-    (expect-output "01123581321345589144233377610987159725844181" "
+(test run-fun-return
+  (expect-output "01123581321345589144233377610987159725844181" "
 fun fib(n) {
   if (n <= 1) return n;
   return fib(n - 2) + fib(n - 1);
@@ -178,8 +183,17 @@ for (var i = 0; i < 20; i = i + 1) {
   print fib(i);
 }"))
 
-(define-test run-fun-nested
-    (expect-output "12" "
+;; TODO This does not evaluate properly!!!---------------
+;; (declaim (optimize (speed 0) (space 0) (debug 3)))
+;; (eval (binary-expr
+;;              :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
+;;              :left (unary-expr
+;;                     :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
+;;                     :right (literal-expr :value 1))
+;;              :right (literal-expr :value 2)))
+
+(test run-fun-nested
+  (expect-output "12" "
 fun makeCounter() {
   var i = 0;
   fun count() {
@@ -193,8 +207,8 @@ var counter = makeCounter();
 counter();
 counter();"))
 
-(define-test run-fun-scoping
-    (expect-output "globalglobal" "
+(test run-fun-scoping
+  (expect-output "globalglobal" "
 var a = \"global\";
 {
   fun showA() {
@@ -205,8 +219,7 @@ var a = \"global\";
   showA();
 }"))
 
-;; TODO This fails - why isn't parachute reporting it properly?
-(define-test run-variable-local-redeclaration
+(test run-variable-local-redeclaration
   (expect-output "" "
 fun bad() {
   var a = \"first\";

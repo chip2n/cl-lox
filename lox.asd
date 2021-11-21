@@ -4,7 +4,7 @@
   :license  "Specify license here"
   :version "0.0.1"
   :serial t
-  :depends-on (#:serapeum #:str #:parse-number #:parachute)
+  :depends-on (#:serapeum #:str #:parse-number #:fiveam)
   :components ((:file "package")
                (:file "scanner")
                (:file "parser")
