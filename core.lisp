@@ -183,15 +183,6 @@ for (var i = 0; i < 20; i = i + 1) {
   print fib(i);
 }"))
 
-;; TODO This does not evaluate properly!!!---------------
-;; (declaim (optimize (speed 0) (space 0) (debug 3)))
-;; (eval (binary-expr
-;;              :operator (make-instance 'token :lexeme "+" :type :plus :literal nil)
-;;              :left (unary-expr
-;;                     :operator (make-instance 'token :lexeme "-" :type :minus :literal nil)
-;;                     :right (literal-expr :value 1))
-;;              :right (literal-expr :value 2)))
-
 (test run-fun-nested
   (expect-output "12" "
 fun makeCounter() {

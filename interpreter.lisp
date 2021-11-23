@@ -213,7 +213,6 @@
   (with-slots (left operator right) expr
     (let ((l (evaluate left))
           (r (evaluate right)))
-
       (ecase (token-type operator)
         (:greater
          (check-number-operands operator l r)
@@ -249,8 +248,8 @@
     (let ((result (evaluate value))
           (distance (gethash expr *lox-locals*)))
       (if distance
-          (env-assign-at distance name value)
-          (env-globals-assign name value))
+          (env-assign-at distance name result)
+          (env-globals-assign name result))
       result)))
 
 (defun truthy? (obj)
