@@ -143,8 +143,9 @@
   (with-slots (lexeme) name
     (loop for i from 0 to (1- (length *scopes*))
           for scope = (nth i *scopes*)
-          do (if (has-key? lexeme scope)
-                 (interpreter-resolve expr i)))))
+          do (when (has-key? lexeme scope)
+               (interpreter-resolve expr i)
+               (return)))))
 
 (defun has-key? (key hashmap)
   (nth-value 1 (gethash key hashmap)))
