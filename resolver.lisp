@@ -68,7 +68,7 @@
   (with-slots (condition then-branch else-branch) stmt
     (resolve condition)
     (resolve then-branch)
-    (when (else-branch) (resolve else-branch))
+    (when else-branch (resolve else-branch))
     nil))
 
 (defmethod resolve ((stmt print-stmt))
