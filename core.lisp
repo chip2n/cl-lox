@@ -210,6 +210,7 @@ var a = \"global\";
   showA();
 }"))
 
+;; TODO I want to be able to check for errors (using *error*? using stderr?)
 (test run-variable-local-redeclaration
   (expect-output "" "
 fun bad() {
