@@ -66,19 +66,24 @@
                    (let ((*lox-stdout* s)) (run source)))))
     (fiveam:is (string= expected output))))
 
+(defmacro test-interpreter (name expected &body body)
+  `(test ,name
+     (with-clean-interpreter
+       (expect-output ,expected (progn ,@body)))))
+
 (fiveam:def-suite run
   :description "Tests for the top level run function")
 
 (fiveam:in-suite run)
 
-(test run-simple
-  (expect-output "onetrue3" "
+(test-interpreter run-simple
+    "onetrue3" "
 print \"one\";
 print true;
-print 2 + 1;"))
+print 2 + 1;")
 
-(test run-scope
-  (expect-output "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
+(test-interpreter run-scope
+    "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
 var a = \"global a\";
 var b = \"global b\";
 var c = \"global c\";
@@ -98,82 +103,82 @@ var c = \"global c\";
 print a;
 print b;
 print c;
-"))
+")
 
-(test run-if-conditional-true
-  (expect-output "true branch" "
+(test-interpreter run-if-conditional-true
+    "true branch" "
 if (true) {
   print \"true branch\";
 } else {
   print \"false branch\";
-}"))
+}")
 
-(test run-if-conditional-false
-  (expect-output "false branch" "
+(test-interpreter run-if-conditional-false
+    "false branch" "
 if (false) {
   print \"true branch\";
 } else {
   print \"false branch\";
-}"))
+}")
 
-(test run-if-conditional-no-else
-  (expect-output "" "
+(test-interpreter run-if-conditional-no-else
+    "" "
 if (false) {
   print \"true branch\";
-}"))
+}")
 
-(test run-logical-or
-  (expect-output "1" "
+(test-interpreter run-logical-or
+    "1" "
 if (false or true) {
   print \"1\";
 } else {
   print \"2\";
-}"))
+}")
 
-(test run-logical-and
-  (expect-output "2" "
+(test-interpreter run-logical-and
+    "2" "
 if (false and true) {
   print \"1\";
 } else {
   print \"2\";
-}"))
+}")
 
-(test run-while
-  (expect-output "012" "
+(test-interpreter run-while
+    "012" "
 var i = 0;
 while (i < 3) {
   print i;
   i = i + 1;
 }
-"))
+")
 
-(test run-for
-  (expect-output "012" "
+(test-interpreter run-for
+    "012" "
 for (var i = 0; i < 3; i = i + 1) {
   print i;
 }
-"))
+")
 
-(test run-fun
-  (expect-output "123" "
+(test-interpreter run-fun
+    "123" "
 fun count(n) {
   if (n > 1) count(n - 1);
   print n;
 }
 count(3);
-"))
+")
 
-(test run-fun2
-  (expect-output "Hi, Dear Reader!" "
+(test-interpreter run-fun2
+    "Hi, Dear Reader!" "
 fun sayHi(first, last) {
   print \"Hi, \" + first + \" \" + last + \"!\";
 }
 
 sayHi(\"Dear\", \"Reader\");
-"))
+")
 
-(test run-fun-return
-  (expect-output "01123581321345589144233377610987159725844181" "
+(test-interpreter run-fun-return
+    "01123581321345589144233377610987159725844181" "
 fun fib(n) {
   if (n <= 1) return n;
   return fib(n - 2) + fib(n - 1);
@@ -181,10 +186,10 @@ fun fib(n) {
 
 for (var i = 0; i < 20; i = i + 1) {
   print fib(i);
-}"))
+}")
 
-(test run-fun-nested
-  (expect-output "12" "
+(test-interpreter run-fun-nested
+    "12" "
 fun makeCounter() {
   var i = 0;
   fun count() {
@@ -196,10 +201,10 @@ fun makeCounter() {
 }
 var counter = makeCounter();
 counter();
-counter();"))
+counter();")
 
-(test run-fun-scoping
-  (expect-output "globalglobal" "
+(test-interpreter run-fun-scoping
+    "globalglobal" "
 var a = \"global\";
 {
   fun showA() {
@@ -208,12 +213,23 @@ var a = \"global\";
   showA();
   var a = \"block\";
   showA();
-}"))
+}")
 
 ;; TODO I want to be able to check for errors (using *error*? using stderr?)
-(test run-variable-local-redeclaration
-  (expect-output "" "
+(test-interpreter run-variable-local-redeclaration
+    "" "
 fun bad() {
   var a = \"first\";
   var a = \"second\";
-}"))
+}")
+
+(test-interpreter run-class-print
+    "DevonshireCream" "
+class DevonshireCream {
+  serveOn() {
+    return \"Scones\";
+  }
+}
+
+print DevonshireCream;
+")

@@ -51,6 +51,7 @@
 (defstmt while ((condition :type expr) (body :type stmt)))
 (defstmt expr ((expression :type expr)))
 (defstmt block ((stmts :type list)))
+(defstmt class ((name :type token) (methods :type list)))
 (defstmt fun ((name :token) (params :type list) (body :type list)))
 (defstmt var ((name :type token) (initializer :type expr)))
 
@@ -194,12 +195,23 @@
 (defgrammar declaration
   (handler-case
       (cond
+        ((match :class) (class-declaration))
         ((match :fun) (fun-declaration))
         ((match :var) (var-declaration))
         (t (statement)))
     (lox-parse-error ()
       (synchronize)
       nil)))
+
+(defgrammar class-declaration
+  (let ((name (consume :identifier "Expect class name."))
+        (methods nil))
+    (consume :left-brace "Expect '{' before class body.")
+    (loop :while (and (not (check :right-brace))
+                      (not (at-end?)))
+          :do (push (fun-declaration) methods))
+    (consume :right-brace "Expect '}' after class body.")
+    (class-stmt :name name :methods (nreverse methods))))
 
 ;; TODO we want to pass "kind" to separate functions from methods (for more accurate error)
 (defgrammar fun-declaration

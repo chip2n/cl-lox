@@ -29,6 +29,12 @@
     (var-define name)
     nil))
 
+(defmethod resolve ((stmt class-stmt))
+  (with-slots (name) stmt
+    (var-declare name)
+    (var-define name))
+  nil)
+
 (defmethod resolve ((expr variable-expr))
   (with-slots (name) expr
     (when (and *scopes* (var-ready? name))

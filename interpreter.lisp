@@ -9,8 +9,20 @@
 (defvar *lox-env* (list (make-hash-table :test 'equal)))
 (defvar *lox-locals* (make-hash-table))
 
+(defmacro with-clean-interpreter (&body body)
+  `(let ((*lox-env* (list (make-hash-table :test 'equal)))
+         (*lox-locals* (make-hash-table)))
+     ,@body))
+
 (defun env-define (lexeme value)
   (setf (gethash lexeme (car *lox-env*)) value))
+
+(defclass lox-class ()
+  ((name :type string
+         :initarg :name)))
+
+(defmethod print-object ((obj lox-class) out)
+  (format out "~a" (slot-value obj 'name)))
 
 (defclass callable ()
   ((arity :type int :initarg :arity
@@ -116,6 +128,12 @@
     (lox-runtime-error (c) (report-runtime-error c))))
 
 (defgeneric evaluate (expr))
+
+(defmethod evaluate ((stmt class-stmt))
+  (with-slots (name) stmt
+    (env-define (token-lexeme name) nil)
+    (env-assign name (make-instance 'lox-class :name (token-lexeme name)))
+    nil))
 
 (defmethod evaluate ((stmt var-stmt))
   (let ((value nil))
