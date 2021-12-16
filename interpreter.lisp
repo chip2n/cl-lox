@@ -17,28 +17,57 @@
 (defun env-define (lexeme value)
   (setf (gethash lexeme (car *lox-env*)) value))
 
-(defclass lox-class ()
+(defclass lox-callable () ()
+  (:documentation "Mixin for callables."))
+
+(defun callable? (obj)
+  (typep obj 'lox-callable))
+
+(defgeneric call (callable args)
+  (:documentation "Call the given callable."))
+
+(defgeneric arity (callable)
+  (:documentation "Get the arity of the given callable."))
+
+(defclass lox-class (lox-callable)
   ((name :type string
          :initarg :name)))
+
+(defmethod call ((callable lox-class) args)
+  (make-instance 'lox-instance :class callable))
+
+(defmethod arity ((callable lox-class))
+  0)
 
 (defmethod print-object ((obj lox-class) out)
   (format out "~a" (slot-value obj 'name)))
 
-(defclass callable ()
-  ((arity :type int :initarg :arity
-          :reader callable-arity)
+(defclass lox-instance ()
+  ((class :type lox-class :initarg :class)))
+
+(defmethod print-object ((obj lox-instance) out)
+  (format out "~a instance" (slot-value obj 'class)))
+
+(defclass lox-function (lox-callable)
+  ((arity :type int :initarg :arity)
    (fun :type function :initarg :fun)
    (closure :type list :initarg :closure)))
 
-(defun callable? (obj)
-  (eq (type-of obj) 'callable))
+(defmethod call ((callable lox-function) args)
+  (handler-case
+      (let ((*lox-env* (slot-value callable 'closure)))
+        (funcall (slot-value callable 'fun) args))
+    (lox-return (c) (lox-return-value c))))
+
+(defmethod arity ((callable lox-function))
+  (slot-value callable 'arity))
 
 (defmacro lox-defun (name args &body body)
   (let ((gargs (gensym)))
     `(let ((*lox-env* (last *lox-env*)))
        (env-define
         ,name
-        (make-instance 'callable
+        (make-instance 'lox-function
                        :arity ,(length args)
                        :fun (lambda (,gargs)
                               (destructuring-bind ,args ,gargs
@@ -184,10 +213,11 @@
                      (env-define (token-lexeme (nth i params))
                                  (nth i args)))
                    (evaluate body)))))
-      (env-define (token-lexeme name) (make-instance 'callable
-                                                     :arity arity
-                                                     :fun fun
-                                                     :closure *lox-env*)))))
+      (env-define (token-lexeme name)
+                  (make-instance 'lox-function
+                                 :arity arity
+                                 :fun fun
+                                 :closure *lox-env*)))))
 
 (defmethod evaluate ((expr variable-expr))
   (lookup-var (slot-value expr 'name) expr))
@@ -220,12 +250,9 @@
                     :collect (evaluate arg))))
     (unless (callable? callee)
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg "Can only call functions and classes."))
-    (unless (= #1=(length args) #2=(callable-arity callee))
+    (unless (= #1=(length args) #2=(arity callee))
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg (format nil "Expected ~a arguments but got ~a." #2# #1#)))
-    (handler-case
-        (let ((*lox-env* (slot-value callee 'closure)))
-          (funcall (slot-value callee 'fun) args))
-      (lox-return (c) (lox-return-value c)))))
+    (call callee args)))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr

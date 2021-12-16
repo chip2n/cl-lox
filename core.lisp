@@ -233,3 +233,10 @@ class DevonshireCream {
 
 print DevonshireCream;
 ")
+
+(test-interpreter run-class-instantiate
+    "Bagel instance" "
+class Bagel {}
+var bagel = Bagel();
+print bagel;
+")
