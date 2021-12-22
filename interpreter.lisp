@@ -43,10 +43,25 @@
   (format out "~a" (slot-value obj 'name)))
 
 (defclass lox-instance ()
-  ((class :type lox-class :initarg :class)))
+  ((class :type lox-class :initarg :class)
+   (fields :type hash-table :initform (make-hash-table :test 'equal))))
 
 (defmethod print-object ((obj lox-instance) out)
   (format out "~a instance" (slot-value obj 'class)))
+
+(defgeneric get-property (obj name)
+  (:documentation "Get property of object")
+  (:method (obj name)
+    (error 'lox-runtime-error
+           :token name
+           :msd "Only instances have properties.")))
+
+(defmethod get-property ((obj lox-instance) name)
+  (let ((lexeme (token-lexeme name)))
+    (multiple-value-bind (value exists?) (gethash lexeme (slot-value obj 'fields))
+      (if exists?
+          value
+          (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme))))))
 
 (defclass lox-function (lox-callable)
   ((arity :type int :initarg :arity)
@@ -253,6 +268,10 @@
     (unless (= #1=(length args) #2=(arity callee))
       (error 'lox-runtime-error :token (slot-value expr 'paren) :msg (format nil "Expected ~a arguments but got ~a." #2# #1#)))
     (call callee args)))
+
+(defmethod evaluate ((expr get-expr))
+  (let ((object (evaluate (slot-value expr 'object))))
+    (get-property object (slot-value expr 'name))))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr

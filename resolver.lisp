@@ -106,6 +106,10 @@
     (loop for argument in arguments do (resolve arguments)))
   nil)
 
+(defmethod resolve ((expr get-expr))
+  (resolve (slot-value expr 'object))
+  nil)
+
 (defmethod resolve ((expr grouping-expr))
   (resolve (slot-value expr 'expression))
   nil)

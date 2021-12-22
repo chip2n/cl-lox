@@ -33,6 +33,7 @@
 (defexpr assign ((name :type token) (value :type expr)))
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr call ((callee :type expr) (paren :type token) (arguments :type list)))
+(defexpr get ((object :type expr) (name :type token)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr logical ((left :type expr) (operator :type token) (right :type expr)))
@@ -387,7 +388,10 @@
       (loop :do
         (if (match :left-paren)
             (setf expr (finish-call expr))
-            (return)))
+            (if (match :dot)
+                (let ((name (consume :identifier "Expect property name after '.'.")))
+                  (setf expr (get-expr :object expr :name name)))
+                (return))))
       expr)))
 
 (defgrammar primary
