@@ -34,6 +34,7 @@
 (defexpr binary ((left :type expr) (operator :type token) (right :type expr)))
 (defexpr call ((callee :type expr) (paren :type token) (arguments :type list)))
 (defexpr get ((object :type expr) (name :type token)))
+(defexpr set ((object :type expr) (name :type token) (value :type expr)))
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr logical ((left :type expr) (operator :type token) (right :type expr)))
@@ -335,7 +336,9 @@
               (value (assignment)))
           (if (eq (type-of expr) 'variable-expr)
               (assign-expr :name (slot-value expr 'name) :value value)
-              (report-error equals "Invalid assignment target.")))
+              (if (eq (type-of expr) 'get-expr)
+                  (set-expr :object (slot-value expr 'object) :name (slot-value expr 'name) :value value)
+                  (report-error equals "Invalid assignment target."))))
         expr)))
 
 (defgrammar logical-or

@@ -31,7 +31,8 @@
 
 (defclass lox-class (lox-callable)
   ((name :type string
-         :initarg :name)))
+         :initarg :name)
+   (methods :type hash-table :initarg :methods)))
 
 (defmethod call ((callable lox-class) args)
   (make-instance 'lox-instance :class callable))
@@ -62,6 +63,19 @@
       (if exists?
           value
           (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme))))))
+
+(defgeneric set-property (obj name value)
+  (:documentation "Set property of object")
+  (:method (obj name value)
+    (error 'lox-runtime-error
+           :token name
+           :msd "Only instances have fields.")))
+
+(defmethod set-property ((obj lox-instance) name value)
+  (let ((lexeme (token-lexeme name)))
+    (setf
+     (gethash lexeme (slot-value obj 'fields))
+     value)))
 
 (defclass lox-function (lox-callable)
   ((arity :type int :initarg :arity)
@@ -272,6 +286,14 @@
 (defmethod evaluate ((expr get-expr))
   (let ((object (evaluate (slot-value expr 'object))))
     (get-property object (slot-value expr 'name))))
+
+(defmethod evaluate ((expr set-expr))
+  (let ((object (evaluate (slot-value expr 'object))))
+    (if (typep object 'lox-instance)
+        (let ((value (evaluate (slot-value expr 'value))))
+          (set-property (slot-value expr 'name) value)
+          value)
+        (error 'lox-runtime-error :token (slot-value expr 'name) :msg "Only instances have fields."))))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr

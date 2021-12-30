@@ -4,7 +4,7 @@
 
 (defvar *scopes* nil)
 
-;; TODO can we statically type this enum?
+;; TODO can we statically type this enum? can be :none, :function, :method
 (defvar *current-function* :none)
 
 (defmacro with-new-scope (&body body)
@@ -30,9 +30,12 @@
     nil))
 
 (defmethod resolve ((stmt class-stmt))
-  (with-slots (name) stmt
+  (with-slots (name methods) stmt
     (var-declare name)
-    (var-define name))
+    (var-define name)
+
+    (loop for method in methods do
+      (resolve-fun method :method)))
   nil)
 
 (defmethod resolve ((expr variable-expr))
@@ -107,6 +110,11 @@
   nil)
 
 (defmethod resolve ((expr get-expr))
+  (resolve (slot-value expr 'object))
+  nil)
+
+(defmethod resolve ((expr set-expr))
+  (resolve (slot-value expr 'value))
   (resolve (slot-value expr 'object))
   nil)
 
