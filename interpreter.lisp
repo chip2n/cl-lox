@@ -188,9 +188,15 @@
 (defgeneric evaluate (expr))
 
 (defmethod evaluate ((stmt class-stmt))
-  (with-slots (name) stmt
+  (with-slots (name methods) stmt
     (env-define (token-lexeme name) nil)
-    (env-assign name (make-instance 'lox-class :name (token-lexeme name)))
+    (let ((methods-table (make-hash-table :test 'equal)))
+      (loop for method in methods do
+        (setf (gethash (slot-value (slot-value method 'name) 'lexeme) methods-table)
+              (lox-function-create method)))
+      (env-assign name (make-instance 'lox-class
+                                      :name (token-lexeme name)
+                                      :methods methods-table)))
     nil))
 
 (defmethod evaluate ((stmt var-stmt))
@@ -234,19 +240,8 @@
     (env-pop)))
 
 (defmethod evaluate ((stmt fun-stmt))
-  (with-slots (name params body) stmt
-    (let ((arity (length params))
-          (fun (lambda (args)
-                 (with-new-env
-                   (loop :for i :upto (1- (length params)) :do
-                     (env-define (token-lexeme (nth i params))
-                                 (nth i args)))
-                   (evaluate body)))))
-      (env-define (token-lexeme name)
-                  (make-instance 'lox-function
-                                 :arity arity
-                                 :fun fun
-                                 :closure *lox-env*)))))
+  (with-slots (name) stmt
+    (env-define (token-lexeme name) (lox-function-create stmt))))
 
 (defmethod evaluate ((expr variable-expr))
   (lookup-var (slot-value expr 'name) expr))
@@ -383,3 +378,19 @@
 (defun env-assign-at (distance name value)
   (setf (gethash (token-lexeme name) (ancestor distance))
         value))
+
+
+
+(defun lox-function-create (fun-stmt)
+  (with-slots (name params body) fun-stmt
+    (let ((arity (length params))
+          (fun (lambda (args)
+                 (with-new-env
+                   (loop :for i :upto (1- (length params)) :do
+                     (env-define (token-lexeme (nth i params))
+                                 (nth i args)))
+                   (evaluate body)))))
+      (make-instance 'lox-function
+                     :arity arity
+                     :fun fun
+                     :closure *lox-env*))))
