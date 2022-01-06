@@ -240,3 +240,14 @@ class Bagel {}
 var bagel = Bagel();
 print bagel;
 ")
+
+(test-interpreter run-class-method-call
+    "Crunch crunch crunch" "
+class Bacon {
+  eat() {
+    print \"Crunch crunch crunch\";
+  }
+}
+
+Bacon().eat();
+")

@@ -58,11 +58,19 @@
            :msd "Only instances have properties.")))
 
 (defmethod get-property ((obj lox-instance) name)
-  (let ((lexeme (token-lexeme name)))
-    (multiple-value-bind (value exists?) (gethash lexeme (slot-value obj 'fields))
-      (if exists?
-          value
-          (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme))))))
+  (with-slots (class) obj
+    (let ((lexeme (token-lexeme name)))
+      (multiple-value-bind (value exists?) (gethash lexeme (slot-value obj 'fields))
+        (if exists?
+            value
+            (let ((method (lox-find-method class lexeme)))
+              (if method
+                  method
+                  (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme)))))))))
+
+(defun lox-find-method (class name)
+  (with-slots (methods) class
+    (gethash name methods)))
 
 (defgeneric set-property (obj name value)
   (:documentation "Set property of object")
