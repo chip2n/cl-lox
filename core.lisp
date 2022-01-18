@@ -251,3 +251,33 @@ class Bacon {
 
 Bacon().eat();
 ")
+
+(test-interpreter run-class-method-this
+    "The German chocolate cake is delicious!" "
+class Cake {
+  taste() {
+    var adjective = \"delicious\";
+    print \"The \" + this.flavor + \" cake is \" + adjective + \"!\";
+  }
+}
+
+var cake = Cake();
+cake.flavor = \"German chocolate\";
+cake.taste();
+")
+
+(test-interpreter run-class-method-this2
+    "Thing instance" "
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      print this;
+    }
+
+    return localFunction;
+  }
+}
+
+var callback = Thing().getCallback();
+callback();
+")

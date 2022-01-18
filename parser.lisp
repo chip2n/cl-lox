@@ -38,6 +38,7 @@
 (defexpr grouping ((expression :type expr)))
 (defexpr literal ((value)))
 (defexpr logical ((left :type expr) (operator :type token) (right :type expr)))
+(defexpr this ((keyword :type token)))
 (defexpr unary ((operator :type token) (right :type expr)))
 (defexpr variable ((name :type token)))
 
@@ -407,6 +408,8 @@
      (let ((expr (expression)))
        (consume :right-paren "Expect ')' after expression.")
        (grouping-expr :expression expr)))
+    ((match :this)
+     (this-expr :keyword (previous)))
     ((match :identifier)
      (variable-expr :name (previous)))
     (t (throw-error (peek) "Expect expression."))))

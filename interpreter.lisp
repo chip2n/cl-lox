@@ -9,6 +9,10 @@
 (defvar *lox-env* (list (make-hash-table :test 'equal)))
 (defvar *lox-locals* (make-hash-table))
 
+(defmacro with-new-env (&body body)
+  `(let ((*lox-env* (cons (make-hash-table :test 'equal) *lox-env*)))
+     ,@body))
+
 (defmacro with-clean-interpreter (&body body)
   `(let ((*lox-env* (list (make-hash-table :test 'equal)))
          (*lox-locals* (make-hash-table)))
@@ -65,8 +69,17 @@
             value
             (let ((method (lox-find-method class lexeme)))
               (if method
-                  method
+                  (bind method obj)
                   (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme)))))))))
+(defun bind (method instance)
+  (with-slots (arity fun closure) method
+    (make-instance 'lox-function
+                   :arity arity
+                   :fun (lambda (args)
+                          (with-new-env
+                            (env-define "this" instance)
+                            (funcall fun args)))
+                   :closure *lox-env*)))
 
 (defun lox-find-method (class name)
   (with-slots (methods) class
@@ -150,10 +163,6 @@
   (when (= (length *lox-env*) 1)
     (error "Cannot pop environment - already at global"))
   (pop *lox-env*))
-
-(defmacro with-new-env (&body body)
-  `(let ((*lox-env* (cons (make-hash-table :test 'equal) *lox-env*)))
-     ,@body))
 
 ;; TODO use reader macro to reuse hashmap place
 (defun env-assign (name value)
@@ -294,9 +303,12 @@
   (let ((object (evaluate (slot-value expr 'object))))
     (if (typep object 'lox-instance)
         (let ((value (evaluate (slot-value expr 'value))))
-          (set-property (slot-value expr 'name) value)
+          (set-property object (slot-value expr 'name) value)
           value)
         (error 'lox-runtime-error :token (slot-value expr 'name) :msg "Only instances have fields."))))
+
+(defmethod evaluate ((expr this-expr))
+  (lookup-var (slot-value expr 'keyword) expr))
 
 (defmethod evaluate ((expr binary-expr))
   (with-slots (left operator right) expr
@@ -379,15 +391,11 @@
   (gethash name (ancestor distance)))
 
 (defun ancestor (distance)
-  (nth distance *lox-env*)
-  ;; (serapeum:drop distance *lox-env*)
-  )
+  (nth distance *lox-env*))
 
 (defun env-assign-at (distance name value)
   (setf (gethash (token-lexeme name) (ancestor distance))
         value))
-
-
 
 (defun lox-function-create (fun-stmt)
   (with-slots (name params body) fun-stmt

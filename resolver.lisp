@@ -34,8 +34,11 @@
     (var-declare name)
     (var-define name)
 
-    (loop for method in methods do
-      (resolve-fun method :method)))
+    (with-new-scope
+      (setf (gethash "this" (car *scopes*)) t)
+
+      (loop for method in methods do
+        (resolve-fun method :method))))
   nil)
 
 (defmethod resolve ((expr variable-expr))
@@ -130,6 +133,9 @@
     (resolve left)
     (resolve right))
   nil)
+
+(defmethod resolve ((expr this-expr))
+  (resolve-local expr (slot-value expr 'keyword)))
 
 (defmethod resolve ((expr unary-expr))
   (resolve (slot-value expr 'right))
