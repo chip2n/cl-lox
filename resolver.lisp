@@ -4,6 +4,10 @@
 
 (defvar *scopes* nil)
 
+;; TODO can we statically type this enum? can be :none, :class
+(defvar *current-class* :none
+  "Tracks whether we're currently inside a class declaration.")
+
 ;; TODO can we statically type this enum? can be :none, :function, :method
 (defvar *current-function* :none)
 
@@ -30,15 +34,16 @@
     nil))
 
 (defmethod resolve ((stmt class-stmt))
-  (with-slots (name methods) stmt
-    (var-declare name)
-    (var-define name)
+  (let ((*current-class* :class))
+    (with-slots (name methods) stmt
+      (var-declare name)
+      (var-define name)
 
-    (with-new-scope
-      (setf (gethash "this" (car *scopes*)) t)
+      (with-new-scope
+        (setf (gethash "this" (car *scopes*)) t)
 
-      (loop for method in methods do
-        (resolve-fun method :method))))
+        (loop for method in methods do
+          (resolve-fun method :method)))))
   nil)
 
 (defmethod resolve ((expr variable-expr))
@@ -135,7 +140,11 @@
   nil)
 
 (defmethod resolve ((expr this-expr))
-  (resolve-local expr (slot-value expr 'keyword)))
+  (if (eq *current-class* :none)
+      (progn
+        (report-error (slot-value expr 'keyword) "Can't use 'this' outside of a class.")
+        nil)
+      (resolve-local expr (slot-value expr 'keyword))))
 
 (defmethod resolve ((expr unary-expr))
   (resolve (slot-value expr 'right))

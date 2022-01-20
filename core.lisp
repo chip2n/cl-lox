@@ -2,6 +2,8 @@
 
 (declaim (optimize (safety 3) (debug 3)))
 
+(defvar *lox-stderr* *error-output*)
+
 (defun main ()
   (let ((args (uiop:command-line-arguments)))
     (when (> (length args) 1)
@@ -53,7 +55,7 @@
       (report (token-line token) (str:concat " at '" (token-lexeme token) "'") msg)))
 
 (defun report (line where msg)
-  (format t "[line ~a] Error~a: ~a~%" line where msg)
+  (format *lox-stderr* "[line ~a] Error~a: ~a~%" line where msg)
   (setf *error* t))
 
 (defun report-runtime-error (c)
@@ -66,23 +68,36 @@
                    (let ((*lox-stdout* s)) (run source)))))
     (fiveam:is (string= expected output))))
 
-(defmacro test-interpreter (name expected &body body)
+(defun expect-error (expected source)
+  (let* ((output (with-output-to-string (s)
+                   (let ((*lox-stderr* s)) (run source)))))
+    ;; Ignore newlines at the end for tests
+    (fiveam:is (string=
+                (str:trim-right expected)
+                (str:trim-right output)))))
+
+(defmacro test-interpreter-error (name expected &body body)
   `(test ,name
-     (with-clean-interpreter
-       (expect-output ,expected (progn ,@body)))))
+         (with-clean-interpreter
+             (expect-error ,expected (progn ,@body)))))
+
+(defmacro test-interpreter-output (name expected &body body)
+  `(test ,name
+         (with-clean-interpreter
+             (expect-output ,expected (progn ,@body)))))
 
 (fiveam:def-suite run
   :description "Tests for the top level run function")
 
 (fiveam:in-suite run)
 
-(test-interpreter run-simple
+(test-interpreter-output run-simple
     "onetrue3" "
 print \"one\";
 print true;
 print 2 + 1;")
 
-(test-interpreter run-scope
+(test-interpreter-output run-scope
     "inner aouter bglobal couter aouter bglobal cglobal aglobal bglobal c" "
 var a = \"global a\";
 var b = \"global b\";
@@ -105,7 +120,7 @@ print b;
 print c;
 ")
 
-(test-interpreter run-if-conditional-true
+(test-interpreter-output run-if-conditional-true
     "true branch" "
 if (true) {
   print \"true branch\";
@@ -113,7 +128,7 @@ if (true) {
   print \"false branch\";
 }")
 
-(test-interpreter run-if-conditional-false
+(test-interpreter-output run-if-conditional-false
     "false branch" "
 if (false) {
   print \"true branch\";
@@ -121,13 +136,13 @@ if (false) {
   print \"false branch\";
 }")
 
-(test-interpreter run-if-conditional-no-else
+(test-interpreter-output run-if-conditional-no-else
     "" "
 if (false) {
   print \"true branch\";
 }")
 
-(test-interpreter run-logical-or
+(test-interpreter-output run-logical-or
     "1" "
 if (false or true) {
   print \"1\";
@@ -135,7 +150,7 @@ if (false or true) {
   print \"2\";
 }")
 
-(test-interpreter run-logical-and
+(test-interpreter-output run-logical-and
     "2" "
 if (false and true) {
   print \"1\";
@@ -143,7 +158,7 @@ if (false and true) {
   print \"2\";
 }")
 
-(test-interpreter run-while
+(test-interpreter-output run-while
     "012" "
 var i = 0;
 while (i < 3) {
@@ -152,14 +167,14 @@ while (i < 3) {
 }
 ")
 
-(test-interpreter run-for
+(test-interpreter-output run-for
     "012" "
 for (var i = 0; i < 3; i = i + 1) {
   print i;
 }
 ")
 
-(test-interpreter run-fun
+(test-interpreter-output run-fun
     "123" "
 fun count(n) {
   if (n > 1) count(n - 1);
@@ -168,7 +183,7 @@ fun count(n) {
 count(3);
 ")
 
-(test-interpreter run-fun2
+(test-interpreter-output run-fun2
     "Hi, Dear Reader!" "
 fun sayHi(first, last) {
   print \"Hi, \" + first + \" \" + last + \"!\";
@@ -177,7 +192,7 @@ fun sayHi(first, last) {
 sayHi(\"Dear\", \"Reader\");
 ")
 
-(test-interpreter run-fun-return
+(test-interpreter-output run-fun-return
     "01123581321345589144233377610987159725844181" "
 fun fib(n) {
   if (n <= 1) return n;
@@ -188,7 +203,7 @@ for (var i = 0; i < 20; i = i + 1) {
   print fib(i);
 }")
 
-(test-interpreter run-fun-nested
+(test-interpreter-output run-fun-nested
     "12" "
 fun makeCounter() {
   var i = 0;
@@ -203,7 +218,7 @@ var counter = makeCounter();
 counter();
 counter();")
 
-(test-interpreter run-fun-scoping
+(test-interpreter-output run-fun-scoping
     "globalglobal" "
 var a = \"global\";
 {
@@ -215,15 +230,14 @@ var a = \"global\";
   showA();
 }")
 
-;; TODO I want to be able to check for errors (using *error*? using stderr?)
-(test-interpreter run-variable-local-redeclaration
-    "" "
+(test-interpreter-error run-variable-local-redeclaration
+    "[line 4] Error at 'a': Already a variable with this name in this scope." "
 fun bad() {
   var a = \"first\";
   var a = \"second\";
 }")
 
-(test-interpreter run-class-print
+(test-interpreter-output run-class-print
     "DevonshireCream" "
 class DevonshireCream {
   serveOn() {
@@ -234,14 +248,14 @@ class DevonshireCream {
 print DevonshireCream;
 ")
 
-(test-interpreter run-class-instantiate
+(test-interpreter-output run-class-instantiate
     "Bagel instance" "
 class Bagel {}
 var bagel = Bagel();
 print bagel;
 ")
 
-(test-interpreter run-class-method-call
+(test-interpreter-output run-class-method-call
     "Crunch crunch crunch" "
 class Bacon {
   eat() {
@@ -252,7 +266,7 @@ class Bacon {
 Bacon().eat();
 ")
 
-(test-interpreter run-class-method-this
+(test-interpreter-output run-class-method-this
     "The German chocolate cake is delicious!" "
 class Cake {
   taste() {
@@ -266,7 +280,7 @@ cake.flavor = \"German chocolate\";
 cake.taste();
 ")
 
-(test-interpreter run-class-method-this2
+(test-interpreter-output run-class-method-this2
     "Thing instance" "
 class Thing {
   getCallback() {
@@ -281,3 +295,7 @@ class Thing {
 var callback = Thing().getCallback();
 callback();
 ")
+
+(test-interpreter-error run-print-this-error
+    "[line 1] Error at 'this': Can't use 'this' outside of a class."
+    "print this;")
