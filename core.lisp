@@ -299,3 +299,26 @@ callback();
 (test-interpreter-error run-print-this-error
     "[line 1] Error at 'this': Can't use 'this' outside of a class."
     "print this;")
+
+(test-interpreter-output run-class-constructor
+    "Hello" "
+class Person {
+  init() {
+    print \"Hello\";
+  }
+}
+
+var person = Person();
+")
+
+(test-interpreter-output run-class-constructor2
+    "Foo instanceFoo instanceFoo instance" "
+class Foo {
+  init() {
+    print this;
+  }
+}
+
+var foo = Foo();
+print foo.init();
+")

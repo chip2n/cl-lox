@@ -39,10 +39,17 @@
    (methods :type hash-table :initarg :methods)))
 
 (defmethod call ((callable lox-class) args)
-  (make-instance 'lox-instance :class callable))
+  (let ((instance (make-instance 'lox-instance :class callable))
+        (initializer (lox-find-method callable "init")))
+    (when initializer
+      (call (bind initializer instance) args))
+    instance))
 
 (defmethod arity ((callable lox-class))
-  0)
+  (let ((initializer (lox-find-method callable "init")))
+    (if initializer
+        (arity initializer)
+        0)))
 
 (defmethod print-object ((obj lox-class) out)
   (format out "~a" (slot-value obj 'name)))
@@ -72,14 +79,18 @@
                   (bind method obj)
                   (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme)))))))))
 (defun bind (method instance)
-  (with-slots (arity fun closure) method
+  (with-slots (arity fun closure initializer?) method
     (make-instance 'lox-function
                    :arity arity
                    :fun (lambda (args)
                           (with-new-env
                             (env-define "this" instance)
-                            (funcall fun args)))
-                   :closure *lox-env*)))
+                            (funcall fun args)
+                            ;; Return `this' if this function is an initializer
+                            (when initializer?
+                              (env-get-at 0 "this"))))
+                   :closure *lox-env*
+                   :initializer? initializer?)))
 
 (defun lox-find-method (class name)
   (with-slots (methods) class
@@ -101,13 +112,15 @@
 (defclass lox-function (lox-callable)
   ((arity :type int :initarg :arity)
    (fun :type function :initarg :fun)
-   (closure :type list :initarg :closure)))
+   (closure :type list :initarg :closure)
+   (initializer? :type boolean :initarg :initializer? :initform nil)))
 
 (defmethod call ((callable lox-function) args)
   (handler-case
       (let ((*lox-env* (slot-value callable 'closure)))
         (funcall (slot-value callable 'fun) args))
-    (lox-return (c) (lox-return-value c))))
+    (lox-return (c)
+      (lox-return-value c))))
 
 (defmethod arity ((callable lox-function))
   (slot-value callable 'arity))
@@ -208,9 +221,10 @@
   (with-slots (name methods) stmt
     (env-define (token-lexeme name) nil)
     (let ((methods-table (make-hash-table :test 'equal)))
-      (loop for method in methods do
-        (setf (gethash (slot-value (slot-value method 'name) 'lexeme) methods-table)
-              (lox-function-create method)))
+      (loop for method in methods
+            for method-lexeme = (slot-value (slot-value method 'name) 'lexeme)
+            do (setf (gethash method-lexeme methods-table)
+                     (lox-function-create method :initializer? (string-equal method-lexeme "init"))))
       (env-assign name (make-instance 'lox-class
                                       :name (token-lexeme name)
                                       :methods methods-table)))
@@ -397,7 +411,7 @@
   (setf (gethash (token-lexeme name) (ancestor distance))
         value))
 
-(defun lox-function-create (fun-stmt)
+(defun lox-function-create (fun-stmt &key initializer?)
   (with-slots (name params body) fun-stmt
     (let ((arity (length params))
           (fun (lambda (args)
@@ -409,4 +423,5 @@
       (make-instance 'lox-function
                      :arity arity
                      :fun fun
-                     :closure *lox-env*))))
+                     :closure *lox-env*
+                     :initializer? initializer?))))
