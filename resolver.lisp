@@ -8,7 +8,7 @@
 (defvar *current-class* :none
   "Tracks whether we're currently inside a class declaration.")
 
-;; TODO can we statically type this enum? can be :none, :function, :method
+;; TODO can we statically type this enum? can be :none, :function, :initializer, :method
 (defvar *current-function* :none)
 
 (defmacro with-new-scope (&body body)
@@ -43,7 +43,9 @@
         (setf (gethash "this" (car *scopes*)) t)
 
         (loop for method in methods do
-          (resolve-fun method :method)))))
+          (if (string-equal (token-lexeme (slot-value method 'name)) "init")
+              (resolve-fun method :initializer)
+              (resolve-fun method :method))))))
   nil)
 
 (defmethod resolve ((expr variable-expr))
@@ -70,7 +72,7 @@
 
 (defun resolve-fun (stmt type)
   (with-new-scope
-    (let (*current-function* type)
+    (let ((*current-function* type))
       (with-slots (params body) stmt
         (loop for param in params do
           (var-declare param)
@@ -95,6 +97,8 @@
 (defmethod resolve ((stmt return-stmt))
   (when (eq *current-function* :none)
     (report-error (slot-value stmt 'keyword) "Can't return from top-level code."))
+  (when (eq *current-function* :initializer)
+    (report-error (slot-value stmt 'keyword) "Can't return a value from an initializer."))
   (with-slots (value) stmt
     (when value (resolve value)))
   nil)
