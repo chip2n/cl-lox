@@ -97,10 +97,11 @@
 (defmethod resolve ((stmt return-stmt))
   (when (eq *current-function* :none)
     (report-error (slot-value stmt 'keyword) "Can't return from top-level code."))
-  (when (eq *current-function* :initializer)
-    (report-error (slot-value stmt 'keyword) "Can't return a value from an initializer."))
   (with-slots (value) stmt
-    (when value (resolve value)))
+    (when value
+      (when (eq *current-function* :initializer)
+        (report-error (slot-value stmt 'keyword) "Can't return a value from an initializer."))
+      (resolve value)))
   nil)
 
 (defmethod resolve ((stmt while-stmt))

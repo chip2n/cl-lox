@@ -323,8 +323,19 @@ var foo = Foo();
 print foo.init();
 ")
 
+(test-interpreter-output run-return-constructor
+    "Foo instance" "
+class Foo {
+  init() {
+    return;
+  }
+}
 
-(test-interpreter-error run-return-constructor
+var foo = Foo();
+print foo.init();
+")
+
+(test-interpreter-error run-return-value-constructor
     "[line 4] Error at 'return': Can't return a value from an initializer." "
 class Foo {
   init() {

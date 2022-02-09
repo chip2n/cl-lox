@@ -80,17 +80,19 @@
                   (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme)))))))))
 (defun bind (method instance)
   (with-slots (arity fun closure initializer?) method
-    (make-instance 'lox-function
-                   :arity arity
-                   :fun (lambda (args)
-                          (with-new-env
-                            (env-define "this" instance)
-                            (funcall fun args)
-                            ;; Return `this' if this function is an initializer
-                            (when initializer?
-                              (env-get-at 0 "this"))))
-                   :closure *lox-env*
-                   :initializer? initializer?)))
+    (let ((closure (with-new-env
+                     (env-define "this" instance)
+                     *lox-env*)))
+      (make-instance 'lox-function
+                     :arity arity
+                     :fun (lambda (args)
+                            (let ((*lox-env* closure))
+                              (funcall fun args)
+                              ;; Return `this' if this function is an initializer
+                              (when initializer?
+                                (env-get-at 0 "this"))))
+                     :closure closure
+                     :initializer? initializer?))))
 
 (defun lox-find-method (class name)
   (with-slots (methods) class
@@ -120,7 +122,10 @@
       (let ((*lox-env* (slot-value callable 'closure)))
         (funcall (slot-value callable 'fun) args))
     (lox-return (c)
-      (lox-return-value c))))
+      (if (slot-value callable 'initializer?)
+          (let ((*lox-env* (slot-value callable 'closure)))
+            (env-get-at 0 "this"))
+          (lox-return-value c)))))
 
 (defmethod arity ((callable lox-function))
   (slot-value callable 'arity))
