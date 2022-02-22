@@ -356,3 +356,16 @@ var NotAClass = \"I am totally not a class\";
 
 class Subclass < NotAClass {}
 ")
+
+(test-interpreter-output run-class-call-superclass-method
+    "Fry until golden brown." "
+class Doughnut {
+  cook() {
+    print \"Fry until golden brown.\";
+  }
+}
+
+class BostonCream < Doughnut {}
+
+BostonCream().cook();
+")

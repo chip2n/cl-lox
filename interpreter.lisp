@@ -95,8 +95,9 @@
                      :initializer? initializer?))))
 
 (defun lox-find-method (class name)
-  (with-slots (methods) class
-    (gethash name methods)))
+  (with-slots (superclass methods) class
+    (or (gethash name methods)
+        (and superclass (lox-find-method superclass name)))))
 
 (defgeneric set-property (obj name value)
   (:documentation "Set property of object")
