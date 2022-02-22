@@ -60,7 +60,7 @@
 
 (defun report-runtime-error (c)
   (with-slots (token msg) c
-    (format t "~a~%[line ~a]" msg (token-line token)))
+    (format *lox-stderr* "~a~%[line ~a]" msg (token-line token)))
   (setf *runtime-error* t))
 
 (defun expect-output (expected source)
@@ -342,4 +342,17 @@ class Foo {
     return \"something else\";
   }
 }
+")
+
+(test-interpreter-error run-class-inherit-itself
+    "[line 2] Error at 'Oops': A class can't inherit from itself." "
+class Oops < Oops {}
+")
+
+(test-interpreter-error run-class-inherit-nonclass
+    "Superclass must be a class.
+[line 4]" "
+var NotAClass = \"I am totally not a class\";
+
+class Subclass < NotAClass {}
 ")

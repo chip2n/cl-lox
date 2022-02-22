@@ -35,9 +35,16 @@
 
 (defmethod resolve ((stmt class-stmt))
   (let ((*current-class* :class))
-    (with-slots (name methods) stmt
+    (with-slots (name superclass methods) stmt
       (var-declare name)
       (var-define name)
+
+      (when superclass
+        (when (string-equal (token-lexeme name)
+                            (token-lexeme (slot-value superclass 'name)))
+          (report-error (slot-value superclass 'name)
+                        "A class can't inherit from itself."))
+        (resolve superclass))
 
       (with-new-scope
         (setf (gethash "this" (car *scopes*)) t)

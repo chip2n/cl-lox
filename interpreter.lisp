@@ -34,8 +34,8 @@
   (:documentation "Get the arity of the given callable."))
 
 (defclass lox-class (lox-callable)
-  ((name :type string
-         :initarg :name)
+  ((name :type string :initarg :name)
+   (superclass :type lox-class :initarg :superclass)
    (methods :type hash-table :initarg :methods)))
 
 (defmethod call ((callable lox-class) args)
@@ -223,16 +223,24 @@
 (defgeneric evaluate (expr))
 
 (defmethod evaluate ((stmt class-stmt))
-  (with-slots (name methods) stmt
-    (env-define (token-lexeme name) nil)
-    (let ((methods-table (make-hash-table :test 'equal)))
-      (loop for method in methods
-            for method-lexeme = (slot-value (slot-value method 'name) 'lexeme)
-            do (setf (gethash method-lexeme methods-table)
-                     (lox-function-create method :initializer? (string-equal method-lexeme "init"))))
-      (env-assign name (make-instance 'lox-class
-                                      :name (token-lexeme name)
-                                      :methods methods-table)))
+  (with-slots (name superclass methods) stmt
+    (let ((superclass-result nil))
+      (when superclass
+        (setf superclass-result (evaluate superclass))
+        (unless (typep superclass-result 'lox-class)
+          (error 'lox-runtime-error
+                 :token (slot-value superclass 'name)
+                 :msg "Superclass must be a class.")))
+      (env-define (token-lexeme name) nil)
+      (let ((methods-table (make-hash-table :test 'equal)))
+        (loop for method in methods
+              for method-lexeme = (slot-value (slot-value method 'name) 'lexeme)
+              do (setf (gethash method-lexeme methods-table)
+                       (lox-function-create method :initializer? (string-equal method-lexeme "init"))))
+        (env-assign name (make-instance 'lox-class
+                                        :name (token-lexeme name)
+                                        :superclass superclass-result
+                                        :methods methods-table))))
     nil))
 
 (defmethod evaluate ((stmt var-stmt))
