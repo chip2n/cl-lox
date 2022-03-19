@@ -46,13 +46,20 @@
                         "A class can't inherit from itself."))
         (resolve superclass))
 
-      (with-new-scope
-        (setf (gethash "this" (car *scopes*)) t)
+      (flet ((build-class-scope ()
+               (with-new-scope
+                 (setf (gethash "this" (car *scopes*)) t)
 
-        (loop for method in methods do
-          (if (string-equal (token-lexeme (slot-value method 'name)) "init")
-              (resolve-fun method :initializer)
-              (resolve-fun method :method))))))
+                 (loop for method in methods do
+                   (if (string-equal (token-lexeme (slot-value method 'name)) "init")
+                       (resolve-fun method :initializer)
+                       (resolve-fun method :method))))))
+        ;; If superclass exist, we create an additional scope for `super'
+        (if superclass
+            (with-new-scope
+              (setf (gethash "super" (car *scopes*)) t)
+              (build-class-scope))
+            (build-class-scope)))))
   nil)
 
 (defmethod resolve ((expr variable-expr))
@@ -150,6 +157,9 @@
     (resolve left)
     (resolve right))
   nil)
+
+(defmethod resolve ((expr super-expr))
+  (resolve-local expr (slot-value expr 'keyword)))
 
 (defmethod resolve ((expr this-expr))
   (if (eq *current-class* :none)

@@ -369,3 +369,45 @@ class BostonCream < Doughnut {}
 
 BostonCream().cook();
 ")
+
+(test-interpreter-output run-class-call-superclass-method-via-super
+    "Fry until golden brown.Pipe full of custard and coat with chocolate." "
+
+class Doughnut {
+  cook() {
+    print \"Fry until golden brown.\";
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print \"Pipe full of custard and coat with chocolate.\";
+  }
+}
+
+BostonCream().cook();
+")
+
+(test-interpreter-output run-class-call-superclass-method-complex
+    "A method" "
+class A {
+  method() {
+    print \"A method\";
+  }
+}
+
+class B < A {
+  method() {
+    print \"B method\";
+  }
+
+  test() {
+    super.method();
+  }
+}
+
+class C < B {}
+
+C().test();
+")

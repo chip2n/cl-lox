@@ -78,15 +78,18 @@
               (if method
                   (bind method obj)
                   (error 'lox-runtime-error :token name :msg (format nil "Undefined property '~a'." lexeme)))))))))
+
 (defun bind (method instance)
   (with-slots (arity fun closure initializer?) method
-    (let ((closure (with-new-env
-                     (env-define "this" instance)
-                     *lox-env*)))
+    (let ((closure
+            (let ((*lox-env* closure))
+              (with-new-env
+                (env-define "this" instance)
+                *lox-env*))))
       (make-instance 'lox-function
                      :arity arity
                      :fun (lambda (args)
-                            (let ((*lox-env* closure))
+                            (let () ;; ((*lox-env* closure))
                               (funcall fun args)
                               ;; Return `this' if this function is an initializer
                               (when initializer?
@@ -233,15 +236,25 @@
                  :token (slot-value superclass 'name)
                  :msg "Superclass must be a class.")))
       (env-define (token-lexeme name) nil)
-      (let ((methods-table (make-hash-table :test 'equal)))
-        (loop for method in methods
-              for method-lexeme = (slot-value (slot-value method 'name) 'lexeme)
-              do (setf (gethash method-lexeme methods-table)
-                       (lox-function-create method :initializer? (string-equal method-lexeme "init"))))
-        (env-assign name (make-instance 'lox-class
-                                        :name (token-lexeme name)
-                                        :superclass superclass-result
-                                        :methods methods-table))))
+
+      (flet ((create-methods ()
+               (let ((methods-table (make-hash-table :test 'equal)))
+                 (loop for method in methods
+                       for method-lexeme = (slot-value (slot-value method 'name) 'lexeme)
+                       do (setf (gethash method-lexeme methods-table)
+                                (lox-function-create method :initializer? (string-equal method-lexeme "init"))))
+                 methods-table)))
+
+        (let ((methods-table
+                (if superclass
+                    (with-new-env
+                      (env-define "super" superclass-result)
+                      (create-methods))
+                    (create-methods))))
+          (env-assign name (make-instance 'lox-class
+                                          :name (token-lexeme name)
+                                          :superclass superclass-result
+                                          :methods methods-table)))))
     nil))
 
 (defmethod evaluate ((stmt var-stmt))
@@ -335,6 +348,16 @@
           value)
         (error 'lox-runtime-error :token (slot-value expr 'name) :msg "Only instances have fields."))))
 
+(defmethod evaluate ((expr super-expr))
+  (let* ((distance (gethash expr *lox-locals*))
+         (superclass (env-get-at distance "super"))
+         (object (env-get-at (- distance 1) "this"))
+         (method (lox-find-method superclass (token-lexeme (slot-value expr 'method)))))
+    (unless method
+      (error 'lox-runtime-error (slot-value expr method)
+             (format nil "Undefined property '~a'." (token-lexeme (slot-value expr 'method)))))
+    (bind method object)))
+
 (defmethod evaluate ((expr this-expr))
   (lookup-var (slot-value expr 'keyword) expr))
 
@@ -427,13 +450,13 @@
 
 (defun lox-function-create (fun-stmt &key initializer?)
   (with-slots (name params body) fun-stmt
-    (let ((arity (length params))
-          (fun (lambda (args)
-                 (with-new-env
-                   (loop :for i :upto (1- (length params)) :do
-                     (env-define (token-lexeme (nth i params))
-                                 (nth i args)))
-                   (evaluate body)))))
+    (let* ((arity (length params))
+           (fun (lambda (args)
+                  (with-new-env
+                    (loop :for i :upto (1- (length params)) :do
+                      (env-define (token-lexeme (nth i params))
+                                  (nth i args)))
+                    (evaluate body)))))
       (make-instance 'lox-function
                      :arity arity
                      :fun fun
