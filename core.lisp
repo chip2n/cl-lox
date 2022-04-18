@@ -411,3 +411,17 @@ class C < B {}
 
 C().test();
 ")
+
+(test-interpreter-error no-super
+    "[line 4] Error at 'super': Can't use 'super' in a class with no superclass."
+  "
+class Eclair {
+  cook() {
+    super.cook();
+    print \"Pipe full of crème pâtissière.\";
+  }
+}")
+
+(test-interpreter-error super-outside-class
+    "[line 1] Error at 'super': Can't use 'super' outside of a class."
+  "super.notEvenInAClass();")

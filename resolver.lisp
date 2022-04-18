@@ -40,6 +40,7 @@
       (var-define name)
 
       (when superclass
+        (setf *current-class* :subclass)
         (when (string-equal (token-lexeme name)
                             (token-lexeme (slot-value superclass 'name)))
           (report-error (slot-value superclass 'name)
@@ -159,7 +160,13 @@
   nil)
 
 (defmethod resolve ((expr super-expr))
-  (resolve-local expr (slot-value expr 'keyword)))
+  (with-slots (keyword) expr
+    (cond
+      ((eq *current-class* :none)
+       (report-error keyword "Can't use 'super' outside of a class."))
+      ((not (eq *current-class* :subclass))
+       (report-error keyword "Can't use 'super' in a class with no superclass.")))
+    (resolve-local expr keyword)))
 
 (defmethod resolve ((expr this-expr))
   (if (eq *current-class* :none)
